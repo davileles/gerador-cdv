@@ -249,100 +249,7 @@ textarea.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-siz
     <p class="ok" id="m-ai-ok" style="color:var(--muted);min-height:18px;margin-top:8px"></p>
   </div>
 
-  <div class="card">
-    <p class="badge-hint">🎟️ Emissão de passagem com milhas</p>
-    <div class="g2" style="margin-bottom:12px">
-      <div class="field">
-        <label>Origem <span class="tag">cidade completa</span></label>
-        <input type="text" id="m-origem" placeholder="Ex: São Paulo"/>
-      </div>
-      <div class="field">
-        <label>Destino <span class="tag">cidade completa</span></label>
-        <input type="text" id="m-destino" placeholder="Ex: Lisboa"/>
-      </div>
-    </div>
-    <div class="g2" style="margin-bottom:12px">
-      <div class="field">
-        <label>Pontos <span class="tag">menor valor</span></label>
-        <input type="number" id="m-pontos" placeholder="Ex: 30000" min="0"/>
-      </div>
-      <div class="field">
-        <label>Programa de fidelidade</label>
-        <select id="m-programa">
-          <option value="">-- selecione --</option>
-          <option value="Smiles">Smiles</option>
-          <option value="Azul Fidelidade">Azul Fidelidade</option>
-          <option value="Azul pelo Mundo">Azul pelo Mundo</option>
-          <option value="LATAM Pass">LATAM Pass</option>
-          <option value="Iberia Plus">Iberia Plus</option>
-          <option value="Privilege Club">Privilege Club</option>
-          <option value="Executive Club">Executive Club</option>
-          <option value="TAP">TAP</option>
-          <option value="AAdvantage">AAdvantage</option>
-          <option value="SUMA">SUMA</option>
-          <option value="Flying Club">Flying Club</option>
-          <option value="Finnair Plus">Finnair Plus</option>
-          <option value="Aeroplan">Aeroplan</option>
-        </select>
-      </div>
-    </div>
-    <div class="g2" style="margin-bottom:12px">
-      <div class="field">
-        <label>Companhia aérea</label>
-        <input type="text" id="m-cia" placeholder="Ex: LATAM, Iberia, TAP..."/>
-      </div>
-      <div class="field">
-        <label>Voo</label>
-        <select id="m-tipo-voo">
-          <option value="nacional">Nacional</option>
-          <option value="internacional">Internacional</option>
-        </select>
-      </div>
-    </div>
-    <div class="field" style="margin-bottom:12px;display:none" id="m-classe-field">
-      <label>Classe <span class="tag">só para internacionais</span></label>
-      <select id="m-classe">
-        <option value="ECONÔMICA">Econômica</option>
-        <option value="EXECUTIVA">Executiva</option>
-      </select>
-    </div>
-    <div class="sep"></div>
-    <div class="field" style="margin-bottom:12px">
-      <label>Datas de ida <span class="tag">uma por linha ou separadas por vírgula</span></label>
-      <textarea id="m-datas-ida" placeholder="Ex: 10, 11, 12 de março&#10;15, 16 de abril" style="min-height:70px"></textarea>
-    </div>
-    <div class="field">
-      <label>Datas de volta</label>
-      <textarea id="m-datas-volta" placeholder="Ex: 20, 21 de março&#10;25, 26 de abril" style="min-height:70px"></textarea>
-    </div>
-  </div>
-
-  <div class="img-upload">
-    <label class="img-label">Imagem <span class="tag" style="text-transform:none">opcional</span></label>
-    <div class="img-drop" id="m-img-drop">
-      <input type="file" id="m-img-input" accept="image/*" style="display:none"/>
-      <div class="img-drop-text">📷 Clique para selecionar ou arraste uma imagem</div>
-      <div class="img-drop-sub">Ou cole uma imagem copiada (Ctrl+V / Cmd+V)</div>
-    </div>
-    <div class="img-preview" id="m-img-preview">
-      <img id="m-img-el" src="" alt="preview"/>
-      <button class="img-clear" id="m-img-clear">✕</button>
-    </div>
-  </div>
-
-  <button class="btn" id="m-inverter-btn" style="background:var(--surface2);color:var(--text);border:1px solid var(--border2);font-weight:700;margin-bottom:4px">🔄 Inverter origem ↔ destino e datas</button>
-  <button class="btn btn-gerar" id="m-gerar-btn">Gerar mensagem</button>
-  <div class="result-card" id="m-result">
-    <div class="result-header"><span>Mensagem gerada</span><div class="dot"></div></div>
-    <pre class="out" id="m-msg"></pre>
-    <textarea class="out" id="m-msg-edit" spellcheck="false"></textarea>
-    <div class="copy-wrap">
-      <button class="btn btn-copy" id="m-copy-btn">Copiar para WhatsApp</button>
-      <button class="btn btn-send" id="m-send-btn">⚡ Enviar no WhatsApp</button>
-      <p class="ok" id="m-ok"></p>
-      <p class="send-ok" id="m-send-ok"></p>
-    </div>
-  </div>
+  <div id="m-emissoes-container" style="display:none;margin-top:16px"></div>
 </div>
 
 </div>
@@ -381,6 +288,7 @@ var currentMode = 'link';
 var currentMilhasMode = 'texto';
 var aiB64 = null, aiType = null, aiPdf = false;
 var mAiFiles = []; // array de {b64, type, isPdf, name}
+var emissoesPendentes = []; // array de emissões identificadas pela IA
 var pastedFile = null, mPastedFile = null;
 
 // ══ LOGO ══
@@ -544,19 +452,25 @@ Responda SOMENTE com JSON válido sem markdown:
 // ══ PROMPT MILHAS ══
 function buildPromptMilhas() {
   return `Você é um assistente especializado em emissão de passagens com milhas.
-Extraia ESTRITAMENTE do conteúdo enviado e responda SOMENTE com JSON válido sem markdown.
+Analise TODOS os arquivos enviados. Pode haver uma ou mais emissões distintas (rotas diferentes).
+Agrupe arquivos que pertençam à mesma emissão e retorne SOMENTE um array JSON válido sem markdown.
 
-REGRAS:
-- origem/destino: cidade completa (sem sigla IATA)
-- pontos: use SEMPRE o MENOR valor encontrado; todas as datas devem ser listadas independente do valor
-- programa: é o PROGRAMA DE FIDELIDADE onde as milhas são resgatadas (ex: AAdvantage, Smiles, LATAM Pass, Azul Fidelidade), NÃO a companhia aérea operadora do voo. Se o conteúdo exibir explicitamente o nome de um programa de fidelidade, use-o com prioridade absoluta, mesmo que a companhia aérea operadora seja diferente. Exemplos: "TudoAzul"→"Azul Fidelidade". "Avios Iberia"→"Iberia Plus". Se o conteúdo mostrar "AAdvantage" e o voo for operado pela GOL, o programa é "AAdvantage" e a cia é "GOL".
-- cia: nome da companhia aérea OPERADORA do voo (quem faz o voo fisicamente), que pode ser diferente do programa de fidelidade
+REGRA DE AGRUPAMENTO CRÍTICA: Se existirem duas rotas espelhadas (ex: MAO→PTY e PTY→MAO) com o mesmo programa e pontos similares, elas fazem parte da MESMA emissão — são os trechos de ida e volta. Nesse caso, consolide em UM único objeto: use a rota com datas de ida como origem/destino principal, e coloque as datas da rota inversa em datas_volta. NÃO crie dois objetos separados para rotas espelhadas do mesmo programa.
+
+REGRAS POR EMISSÃO:
+- origem/destino: cidade completa (sem sigla IATA). Use mapeamento: GRU/Congonhas→São Paulo, GIG/Galeão→Rio de Janeiro, SDU/Santos Dumont→Rio de Janeiro, CGH/Congonhas→São Paulo
+- pontos: use SEMPRE o MENOR valor encontrado
+- programa: PROGRAMA DE FIDELIDADE onde as milhas são resgatadas (ex: AAdvantage, Smiles, LATAM Pass, Azul Fidelidade), NÃO a companhia aérea. Se o conteúdo exibir explicitamente um programa, use-o com prioridade absoluta. Ex: "TudoAzul"→"Azul Fidelidade", "Avios Iberia"→"Iberia Plus". Se mostrar "AAdvantage" com voo GOL, programa="AAdvantage", cia="GOL".
+- cia: companhia aérea OPERADORA do voo (pode ser diferente do programa)
 - tipo: "nacional" ou "internacional"
 - classe: "ECONÔMICA" ou "EXECUTIVA" (só internacional; nacional deixe vazio)
-- datas_ida: TODAS as datas disponíveis, agrupadas por mês (uma linha por mês). Ex: "Agosto: 13\nSetembro: 12, 19\nNovembro: 9"
-- datas_volta: idem. Incluir ano se diferente do atual. Ex: "Setembro: 19\nAbril/2027: 1, 9"
+- datas_ida: TODAS as datas, agrupadas por mês. Ex: "Agosto: 13\nSetembro: 12, 19"
+- datas_volta: idem. Incluir ano se diferente do atual
+- arquivos_ida: índices (1-based) dos arquivos com datas de ida desta emissão. Ex: [1] ou [1,2]
+- arquivos_volta: índices (1-based) dos arquivos com datas de volta. Ex: [2] ou []
 
-{"origem":"","destino":"","pontos":0,"programa":"","cia":"","tipo":"nacional","classe":"","datas_ida":"","datas_volta":""}`;
+Retorne SOMENTE o array, mesmo que haja apenas uma emissão:
+[{"origem":"","destino":"","pontos":0,"programa":"","cia":"","tipo":"nacional","classe":"","datas_ida":"","datas_volta":"","arquivos_ida":[],"arquivos_volta":[]}]`;
 }
 
 // ══ API KEY ══
@@ -600,7 +514,8 @@ async function chamarIA(messages, useSearch) {
     body.messages = body.messages.concat([{role:'assistant',content:data.content},{role:'user',content:results}]);
   }
   text = text.replace(/```json\s*/gi,'').replace(/```\s*/gi,'').trim();
-  var match = text.match(/\{[\s\S]*\}/);
+  // aceita array ou objeto
+  var match = text.match(/\[[\s\S]*\]/) || text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error('JSON não encontrado: '+text.substring(0,200));
   return JSON.parse(match[0]);
 }
@@ -785,31 +700,22 @@ async function analisarMilhas() {
   okEl.style.color='var(--muted)'; okEl.textContent='Analisando...';
 
   try {
-    var obj = await chamarIA(messages);
-    ['m-origem','m-destino','m-pontos','m-cia','m-datas-ida','m-datas-volta'].forEach(function(id){
-      document.getElementById(id).value='';
+    var resultado = await chamarIA(messages);
+    // normalizar para array
+    var emissoes = Array.isArray(resultado) ? resultado : [resultado];
+    emissoes.forEach(function(obj, idx) {
+      obj.origem  = normalizarCidade(obj.origem  || '');
+      obj.destino = normalizarCidade(obj.destino || '');
+      // associar arquivos de imagem desta emissão (ida e volta)
+      var idxsIda   = (obj.arquivos_ida   || []).map(function(n){ return n-1; });
+      var idxsVolta = (obj.arquivos_volta || []).map(function(n){ return n-1; });
+      obj._filesIda   = idxsIda.map(function(i){ return mAiFiles[i] || null; }).filter(Boolean);
+      obj._filesVolta = idxsVolta.map(function(i){ return mAiFiles[i] || null; }).filter(Boolean);
     });
-    document.getElementById('m-programa').value='';
-    document.getElementById('m-tipo-voo').value='nacional';
-    document.getElementById('m-classe').value='ECONÔMICA';
-    document.getElementById('m-classe-field').style.display='none';
-
-    if (obj.origem)      document.getElementById('m-origem').value=normalizarCidade(obj.origem);
-    if (obj.destino)     document.getElementById('m-destino').value=normalizarCidade(obj.destino);
-    if (obj.pontos)      document.getElementById('m-pontos').value=obj.pontos;
-    if (obj.cia)         document.getElementById('m-cia').value=obj.cia;
-    if (obj.datas_ida)   document.getElementById('m-datas-ida').value=obj.datas_ida;
-    if (obj.datas_volta) document.getElementById('m-datas-volta').value=obj.datas_volta;
-    if (obj.programa) {
-      var sel=document.getElementById('m-programa');
-      for (var i=0;i<sel.options.length;i++) { if (sel.options[i].value===obj.programa){sel.value=obj.programa;break;} }
-    }
-    if (obj.tipo) {
-      document.getElementById('m-tipo-voo').value=obj.tipo;
-      document.getElementById('m-classe-field').style.display=obj.tipo==='internacional'?'flex':'none';
-    }
-    if (obj.classe) document.getElementById('m-classe').value=obj.classe;
-    okEl.style.color='#4ade80'; okEl.textContent='✓ Campos preenchidos! Revise antes de gerar.';
+    emissoesPendentes = emissoes;
+    renderEmissoes();
+    okEl.style.color='#4ade80';
+    okEl.textContent='✓ ' + emissoes.length + ' emissão(ões) identificada(s)! Gere as mensagens abaixo.';
   } catch(e) {
     okEl.style.color='#ff585e';
     var errmsg = e.message || String(e);
@@ -860,6 +766,234 @@ function inverterMilhas() {
   datasVoltaEl.value = tmpIda;
 }
 
+// ══ RENDER EMISSÕES ══
+function renderEmissoes() {
+  var container = document.getElementById('m-emissoes-container');
+  container.innerHTML = '';
+  emissoesPendentes.forEach(function(obj, idx) {
+    var id = 'm-em-' + idx;
+    var card = document.createElement('div');
+    card.className = 'card';
+    card.style.cssText = 'margin-bottom:16px;padding:16px;border:1px solid var(--border2);border-radius:var(--r);';
+    card.innerHTML = buildEmissaoFormHTML(obj, idx);
+    container.appendChild(card);
+    // preview imagens
+    ['ida','volta'].forEach(function(dir) {
+      var files = dir === 'ida' ? obj._filesIda : obj._filesVolta;
+      var previewEl = document.getElementById(id+'-img-preview-'+dir);
+      if (!previewEl) return;
+      previewEl.innerHTML = '';
+      (files || []).forEach(function(f) {
+        if (!f.isPdf) {
+          var img = document.createElement('img');
+          img.src = f.src;
+          img.style.cssText = 'width:100%;max-height:130px;object-fit:cover;border-radius:6px;margin-bottom:4px;cursor:pointer;';
+          img.title = 'Clique para usar como imagem de ' + dir;
+          img.addEventListener('click', (function(fi, d, i){ return function(){
+            emissoesPendentes[i]['_imgSelecionada_'+d] = fi;
+            img.style.outline = '2px solid var(--accent)';
+          }; })(f, dir, idx));
+          previewEl.appendChild(img);
+        }
+      });
+    });
+  });
+  document.getElementById('m-emissoes-container').style.display = emissoesPendentes.length ? 'block' : 'none';
+}
+
+function buildEmissaoFormHTML(obj, idx) {
+  var id = 'm-em-' + idx;
+  var programaOptions = '';
+  var programas = ['Smiles','Azul Fidelidade','Azul pelo Mundo','LATAM Pass','Iberia Plus','Privilege Club','Executive Club','TAP','AAdvantage','SUMA','Flying Club','Finnair Plus','Aeroplan'];
+  programas.forEach(function(p) {
+    programaOptions += '<option value="'+p+'"'+(obj.programa===p?' selected':'')+'>'+p+'</option>';
+  });
+  var isIntl = obj.tipo === 'internacional';
+  return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+    + '<strong style="font-size:14px">✈️ Emissão '+(idx+1)+': '+( obj.origem||'?')+' → '+(obj.destino||'?')+'</strong>'
+    + '<button onclick="removerEmissao('+idx+')" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-size:18px;padding:0">✕</button>'
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
+    + '<div class="field" style="margin:0"><label>Origem</label><input id="'+id+'-origem" value="'+(obj.origem||'')+'"/></div>'
+    + '<div class="field" style="margin:0"><label>Destino</label><input id="'+id+'-destino" value="'+(obj.destino||'')+'"/></div>'
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
+    + '<div class="field" style="margin:0"><label>Pontos</label><input id="'+id+'-pontos" type="number" value="'+(obj.pontos||0)+'"/></div>'
+    + '<div class="field" style="margin:0"><label>Cia aérea</label><input id="'+id+'-cia" value="'+(obj.cia||'')+'"/></div>'
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
+    + '<div class="field" style="margin:0"><label>Programa</label><select id="'+id+'-programa"><option value="">Selecione</option>'+programaOptions+'</select></div>'
+    + '<div class="field" style="margin:0"><label>Tipo</label><select id="'+id+'-tipo" onchange="toggleClasseEmissao('+idx+')">'
+    + '<option value="nacional"'+(obj.tipo==='nacional'?' selected':'')+'>Nacional</option>'
+    + '<option value="internacional"'+(obj.tipo==='internacional'?' selected':'')+'>Internacional</option>'
+    + '</select></div>'
+    + '</div>'
+    + '<div id="'+id+'-classe-field" class="field" style="margin-bottom:8px;'+(isIntl?'':'display:none')+'">'
+    + '<label>Classe</label><select id="'+id+'-classe">'
+    + '<option value="ECONÔMICA"'+(obj.classe==='ECONÔMICA'?' selected':'')+'>ECONÔMICA</option>'
+    + '<option value="EXECUTIVA"'+(obj.classe==='EXECUTIVA'?' selected':'')+'>EXECUTIVA</option>'
+    + '</select></div>'
+    + '<div class="field" style="margin-bottom:8px"><label>Datas de ida</label>'
+    + '<textarea id="'+id+'-datas-ida" style="min-height:60px">'+(obj.datas_ida||'')+'</textarea></div>'
+    + '<div class="field" style="margin-bottom:8px"><label>Datas de volta</label>'
+    + '<textarea id="'+id+'-datas-volta" style="min-height:60px">'+(obj.datas_volta||'')+'</textarea></div>'
+    // imagens
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
+    + '<div><label style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Imagem de ida</label>'
+    + '<div id="'+id+'-img-preview-ida" style="margin-bottom:4px"></div>'
+    + '<div class="img-drop" style="padding:8px;font-size:12px" onclick="triggerImgUpload('+idx+',&apos;ida&apos;)">'
+    + '<input type="file" id="'+id+'-img-file-ida" accept="image/*" style="display:none" onchange="selecionarImgEmissao('+idx+',&apos;ida&apos;,this)"/>'
+    + '📷 Outro arquivo</div></div>'
+    + '<div><label style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Imagem de volta</label>'
+    + '<div id="'+id+'-img-preview-volta" style="margin-bottom:4px"></div>'
+    + '<div class="img-drop" style="padding:8px;font-size:12px" onclick="triggerImgUpload('+idx+',&apos;volta&apos;)">'
+    + '<input type="file" id="'+id+'-img-file-volta" accept="image/*" style="display:none" onchange="selecionarImgEmissao('+idx+',&apos;volta&apos;,this)"/>'
+    + '📷 Outro arquivo</div></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
+    + '<button class="btn" style="background:var(--surface2);color:var(--text);border:1px solid var(--border2);font-weight:700;flex:0 0 auto;padding:10px 14px" onclick="inverterEmissao('+idx+')">🔄 Inverter</button>'
+    + '<button class="btn btn-gerar" style="flex:1" onclick="gerarMensagemEmissao('+idx+')">Gerar mensagem</button>'
+    + '</div>'
+    + '<div class="result-card" id="'+id+'-result" style="display:none;margin-top:12px">'
+    + '<div class="result-header"><span>Mensagem gerada</span><div class="dot"></div></div>'
+    + '<textarea class="out" id="'+id+'-msg-edit" spellcheck="false"></textarea>'
+    + '<div class="copy-wrap">'
+    + '<button class="btn btn-copy" onclick="copiarEmissao('+idx+')">Copiar para WhatsApp</button>'
+    + '<button class="btn btn-send" onclick="enviarEmissao('+idx+')">⚡ Enviar no WhatsApp</button>'
+    + '<p class="ok" id="'+id+'-ok"></p>'
+    + '<p class="send-ok" id="'+id+'-send-ok"></p>'
+    + '</div></div>';
+}
+
+function removerEmissao(idx) {
+  emissoesPendentes.splice(idx, 1);
+  renderEmissoes();
+}
+
+function toggleClasseEmissao(idx) {
+  var id = 'm-em-'+idx;
+  var tipo = document.getElementById(id+'-tipo').value;
+  document.getElementById(id+'-classe-field').style.display = tipo==='internacional' ? '' : 'none';
+}
+
+function triggerImgUpload(idx, dir) {
+  document.getElementById('m-em-'+idx+'-img-file-'+dir).click();
+}
+
+function selecionarImgEmissao(idx, dir, input) {
+  if (!input.files[0]) return;
+  var r = new FileReader();
+  r.onload = function(e) {
+    emissoesPendentes[idx]['_imgSelecionada_'+dir] = {src: e.target.result, file: input.files[0]};
+    var prev = document.getElementById('m-em-'+idx+'-img-preview-'+dir);
+    prev.innerHTML = '';
+    var img = document.createElement('img');
+    img.src = e.target.result;
+    img.style.cssText = 'width:100%;max-height:100px;object-fit:cover;border-radius:6px;outline:2px solid var(--accent)';
+    prev.appendChild(img);
+  };
+  r.readAsDataURL(input.files[0]);
+}
+
+function inverterEmissao(idx) {
+  var id = 'm-em-'+idx;
+  var origem = document.getElementById(id+'-origem');
+  var destino = document.getElementById(id+'-destino');
+  var datasIda = document.getElementById(id+'-datas-ida');
+  var datasVolta = document.getElementById(id+'-datas-volta');
+  var tmp = origem.value; origem.value = destino.value; destino.value = tmp;
+  tmp = datasIda.value; datasIda.value = datasVolta.value; datasVolta.value = tmp;
+}
+
+function gerarMensagemEmissao(idx) {
+  var id = 'm-em-'+idx;
+  var origem   = document.getElementById(id+'-origem').value.trim();
+  var destino  = document.getElementById(id+'-destino').value.trim();
+  var pontos   = parseInt(document.getElementById(id+'-pontos').value)||0;
+  var programa = document.getElementById(id+'-programa').value;
+  var cia      = document.getElementById(id+'-cia').value.trim();
+  var tipo     = document.getElementById(id+'-tipo').value;
+  var classe   = document.getElementById(id+'-classe') ? document.getElementById(id+'-classe').value : '';
+  var datasIda  = document.getElementById(id+'-datas-ida').value.trim();
+  var datasVolta= document.getElementById(id+'-datas-volta').value.trim();
+  if (!origem||!destino) { alert('Preencha origem e destino.'); return; }
+  if (!pontos) { alert('Informe a quantidade de pontos.'); return; }
+  if (!programa) { alert('Selecione o programa de fidelidade.'); return; }
+  var cpm = PROGRAMAS_CPM[programa]||0;
+  var valorReais = cpm>0 ? Math.round((pontos/1000)*cpm) : 0;
+  var valorStr = valorReais>0 ? 'R$ '+valorReais.toLocaleString('pt-BR') : '—';
+  var linkProg = PROGRAMAS_LINK[programa]||'';
+  var trechoInfo = tipo==='internacional' ? ' o trecho em '+classe : '';
+  var titulo = '*'+origem+' - '+destino+' por '+pontos.toLocaleString('pt-BR')+' pontos OU '+valorStr+trechoInfo+'*';
+  var msg = titulo+'\n\n'+RODAPE_MILHAS+'\n\n';
+  msg += 'Você pode comprar essa passagem no Balcão de Milhas CDV por aproximadamente '+valorStr+' o trecho + taxa de embarque.\n\n';
+  msg += BALCAO_LINK+'\n\n';
+  msg += '🛫 *DATAS DE IDA*\n'+(datasIda||'—')+'\n\n';
+  msg += '🛬 *DATAS DE VOLTA*\n'+(datasVolta||'—')+'\n\n';
+  msg += '🎟️ *PROGRAMA* '+programa+'\n\n';
+  msg += '✈️ *CIA AÉREA* '+cia+'\n\n';
+  msg += '🔗 *LINK* '+linkProg+'\n\n';
+  msg += RODAPE_MILHAS;
+  var editEl = document.getElementById(id+'-msg-edit');
+  editEl.value = msg;
+  editEl.style.height='auto'; editEl.style.height=editEl.scrollHeight+'px';
+  var resultCard = document.getElementById(id+'-result');
+  resultCard.style.display='block';
+  setTimeout(function(){ resultCard.scrollIntoView({behavior:'smooth',block:'nearest'}); }, 50);
+  document.getElementById(id+'-ok').textContent='';
+}
+
+function copiarEmissao(idx) {
+  var id = 'm-em-'+idx;
+  var editEl = document.getElementById(id+'-msg-edit');
+  var texto = editEl ? editEl.value : '';
+  var okEl = document.getElementById(id+'-ok');
+  if (!texto) { okEl.textContent='Gere a mensagem primeiro.'; return; }
+  var done = function(){ okEl.style.color='#4ade80'; okEl.textContent='Copiado!'; setTimeout(function(){ okEl.textContent=''; }, 3500); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texto).then(done).catch(function(){ fallbackCopy(texto, done); });
+  } else { fallbackCopy(texto, done); }
+}
+
+async function enviarEmissao(idx) {
+  var id = 'm-em-'+idx;
+  var editEl = document.getElementById(id+'-msg-edit');
+  var texto = editEl ? editEl.value : '';
+  var s = document.getElementById(id+'-send-ok');
+  if (!wsConectado) { s.style.color='#ff585e'; s.textContent='Servidor desconectado.'; setTimeout(function(){ s.textContent=''; }, 4000); return; }
+  s.style.color='#eeeeee'; s.textContent='Enviando...';
+  var imgIda   = emissoesPendentes[idx] && emissoesPendentes[idx]['_imgSelecionada_ida'];
+  var imgVolta = emissoesPendentes[idx] && emissoesPendentes[idx]['_imgSelecionada_volta'];
+  try {
+    var r;
+    if (imgIda) {
+      var fd = new FormData();
+      var fileIda = imgIda.file || dataURLtoFile(imgIda.src, 'ida.jpg');
+      fd.append('imagem', fileIda); fd.append('legenda', texto); fd.append('grupo', GRUPO_EMISSAO);
+      r = await fetch(SERVER+'/enviar-imagem', {method:'POST', body:fd});
+    } else {
+      r = await fetch(SERVER+'/enviar', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({mensagem:texto, grupo:GRUPO_EMISSAO})});
+    }
+    var d = await r.json();
+    if (d.ok) { s.style.color='#4ade80'; s.textContent='✓ Enviado!'; setTimeout(function(){ s.textContent=''; }, 4000); }
+    else { s.style.color='#ff585e'; s.textContent='Erro: '+(d.erro||'falha'); setTimeout(function(){ s.textContent=''; }, 5000); }
+    // enviar imagem de volta separada se houver
+    if (d.ok && imgVolta) {
+      var fd2 = new FormData();
+      var fileVolta = imgVolta.file || dataURLtoFile(imgVolta.src, 'volta.jpg');
+      fd2.append('imagem', fileVolta); fd2.append('legenda', ''); fd2.append('grupo', GRUPO_EMISSAO);
+      await fetch(SERVER+'/enviar-imagem', {method:'POST', body:fd2});
+    }
+  } catch(e) { s.style.color='#ff585e'; s.textContent='Erro: '+e.message; }
+}
+
+function dataURLtoFile(dataurl, filename) {
+  var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1];
+  var bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+  while(n--) u8arr[n] = bstr.charCodeAt(n);
+  return new File([u8arr], filename, {type:mime});
+}
+
 // ══ GERAR MILHAS ══
 function gerarMilhas() {
   var origem=document.getElementById('m-origem').value.trim();
@@ -898,13 +1032,14 @@ function gerarMilhas() {
 function hoje(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 
 function mostrar(msgId, cardId, okId, msg) {
-  // preenche o textarea editável (msgId+'−edit')
   var editId = msgId + '-edit';
   var editEl = document.getElementById(editId);
   if (editEl) { editEl.value = msg; editEl.style.height='auto'; editEl.style.height=editEl.scrollHeight+'px'; }
   var card = document.getElementById(cardId);
+  if (!card) return;
   card.style.display = 'block';
-  document.getElementById(okId).textContent = '';
+  var okEl = document.getElementById(okId);
+  if (okEl) okEl.textContent = '';
   setTimeout(function(){ card.scrollIntoView({behavior:'smooth',block:'nearest'}); }, 50);
 }
 
@@ -983,20 +1118,22 @@ window.addEventListener('DOMContentLoaded', function() {
 
   // botões gerar
   document.getElementById('o-gerar-btn').addEventListener('click', gerarOferta);
-  document.getElementById('m-inverter-btn').addEventListener('click', inverterMilhas);
-  document.getElementById('m-gerar-btn').addEventListener('click', gerarMilhas);
+
+
 
   // botões copiar
   document.getElementById('o-copy-btn').addEventListener('click', function(){ copiar('o-msg','o-ok'); });
-  document.getElementById('m-copy-btn').addEventListener('click', function(){ copiar('m-msg','m-ok'); });
+
 
   // botões enviar
   document.getElementById('o-send-btn').addEventListener('click', function(){ enviarWA('o-msg','o-send-ok','o'); });
-  document.getElementById('m-send-btn').addEventListener('click', function(){ enviarWA('m-msg','m-send-ok','m'); });
 
-  // tipo de voo
-  document.getElementById('m-tipo-voo').addEventListener('change', function(){
-    document.getElementById('m-classe-field').style.display = this.value==='internacional' ? 'flex' : 'none';
+
+  // tipo de voo (formulário estático de milhas — só se existir)
+  var mTipoVooEl = document.getElementById('m-tipo-voo');
+  if (mTipoVooEl) mTipoVooEl.addEventListener('change', function(){
+    var cf = document.getElementById('m-classe-field');
+    if (cf) cf.style.display = this.value==='internacional' ? 'flex' : 'none';
   });
 
   // arquivo IA oferta
@@ -1038,12 +1175,15 @@ window.addEventListener('DOMContentLoaded', function() {
   // imagem mensagem milhas
   var mImgInput = document.getElementById('m-img-input');
   var mImgDrop  = document.getElementById('m-img-drop');
-  mImgDrop.addEventListener('click', function(){ mImgInput.click(); });
-  mImgInput.addEventListener('change', function(){ if(mImgInput.files[0]) carregarImgMsg(mImgInput.files[0], true); });
-  mImgDrop.addEventListener('dragover',  function(e){ e.preventDefault(); mImgDrop.classList.add('dragover'); });
-  mImgDrop.addEventListener('dragleave', function(){ mImgDrop.classList.remove('dragover'); });
-  mImgDrop.addEventListener('drop', function(e){ e.preventDefault(); mImgDrop.classList.remove('dragover'); if(e.dataTransfer.files[0]) carregarImgMsg(e.dataTransfer.files[0], true); });
-  document.getElementById('m-img-clear').addEventListener('click', function(){ mImgInput.value=''; document.getElementById('m-img-el').src=''; document.getElementById('m-img-preview').style.display='none'; mPastedFile=null; });
+  if (mImgInput && mImgDrop) {
+    mImgDrop.addEventListener('click', function(){ mImgInput.click(); });
+    mImgInput.addEventListener('change', function(){ if(mImgInput.files[0]) carregarImgMsg(mImgInput.files[0], true); });
+    mImgDrop.addEventListener('dragover',  function(e){ e.preventDefault(); mImgDrop.classList.add('dragover'); });
+    mImgDrop.addEventListener('dragleave', function(){ mImgDrop.classList.remove('dragover'); });
+    mImgDrop.addEventListener('drop', function(e){ e.preventDefault(); mImgDrop.classList.remove('dragover'); if(e.dataTransfer.files[0]) carregarImgMsg(e.dataTransfer.files[0], true); });
+    var mImgClear = document.getElementById('m-img-clear');
+    if (mImgClear) mImgClear.addEventListener('click', function(){ mImgInput.value=''; document.getElementById('m-img-el').src=''; document.getElementById('m-img-preview').style.display='none'; mPastedFile=null; });
+  }
 
   // paste global
   document.addEventListener('paste', function(e){
