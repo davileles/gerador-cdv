@@ -289,6 +289,14 @@ textarea.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-siz
 
 <!-- ══ PAINEL ALERTAS ══ -->
 <div class="main-panel" id="panel-alertas">
+  <!-- Injetar texto manualmente -->
+  <div style="margin-bottom:14px">
+    <textarea id="inject-texto" placeholder="Cole aqui um texto de emissão para injetar diretamente no pipeline..." style="width:100%;height:80px;resize:vertical;background:var(--surface2);color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12px;font-family:var(--font);box-sizing:border-box"></textarea>
+    <div style="display:flex;gap:8px;margin-top:6px;align-items:center">
+      <button class="btn" id="inject-btn" style="flex:0 0 auto;padding:8px 16px;background:var(--accent)">📨 Injetar no pipeline</button>
+      <span id="inject-fb" style="font-size:12px;color:var(--muted2)"></span>
+    </div>
+  </div>
   <div id="alertas-buffer-bar" style="display:none" class="alerta-buffer">
     <span class="spin">⏳</span>
     <span id="alertas-buffer-txt">0 item(s) aguardando janela de 3 min...</span>
@@ -509,8 +517,8 @@ REGRAS POR EMISSÃO:
 - cia: companhia aérea OPERADORA do voo (pode ser diferente do programa)
 - tipo: "nacional" ou "internacional"
 - classe: "ECONÔMICA" ou "EXECUTIVA" (só internacional; nacional deixe vazio)
-- datas_ida: TODAS as datas, agrupadas por mês. Ex: "Agosto: 13\nSetembro: 12, 19"
-- datas_volta: idem. Incluir ano se diferente do atual
+- datas_ida: TODAS as datas, agrupadas por mês em formato compacto. Ex: "Ago/26: 13, 14, 15\nSet/26: 12, 19" — use abreviação de 3 letras + /ano
+- datas_volta: idem formato compacto
 - arquivos_ida: índices (1-based) dos arquivos com datas de ida desta emissão. Ex: [1] ou [1,2]
 - arquivos_volta: índices (1-based) dos arquivos com datas de volta. Ex: [2] ou []
 
@@ -522,7 +530,7 @@ Retorne SOMENTE o array, mesmo que haja apenas uma emissão:
 
 // ══ CHAMADA API ══
 async function chamarIA(messages, useSearch) {
-  var body = { model:'claude-sonnet-4-5-20250929', max_tokens:2000, messages:messages };
+  var body = { model:'claude-sonnet-4-5-20250929', max_tokens:8192, messages:messages };
   if (useSearch) body.tools = [{type:'web_search_20250305', name:'web_search'}];
   var text = '';
   for (var t=0; t<6; t++) {
@@ -1201,6 +1209,30 @@ async function enviarWA(msgId,statusId,fileKey) {
 window.addEventListener('DOMContentLoaded', function() {
   document.getElementById('tab-oferta').addEventListener('click', function(){ switchMain('oferta'); });
   document.getElementById('tab-milhas').addEventListener('click', function(){ switchMain('milhas'); });
+  // Injetar texto manualmente no pipeline
+  document.getElementById('inject-btn').addEventListener('click', async function() {
+    var txt = document.getElementById('inject-texto').value.trim();
+    var fb  = document.getElementById('inject-fb');
+    if (!txt) { fb.style.color='#ff585e'; fb.textContent='Cole um texto antes.'; return; }
+    fb.style.color='var(--muted2)'; fb.textContent='Enviando...';
+    try {
+      var r = await fetch(SERVER + '/injetar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto: txt })
+      });
+      var d = await r.json();
+      if (d.ok) {
+        fb.style.color='#4ade80';
+        fb.textContent='✓ Injetado! Aguarde ~3 min para aparecer nos alertas.';
+        document.getElementById('inject-texto').value = '';
+        setTimeout(carregarAlertas, 3500);
+      } else {
+        fb.style.color='#ff585e'; fb.textContent='Erro: ' + (d.erro || 'desconhecido');
+      }
+    } catch(e) { fb.style.color='#ff585e'; fb.textContent='Sem resposta do servidor.'; }
+  });
+
   document.getElementById('tab-alertas').addEventListener('click', function(){ switchMain('alertas'); });
   document.getElementById('mt-link').addEventListener('click',   function(){ setMode('link'); });
   document.getElementById('mt-texto').addEventListener('click',  function(){ setMode('texto'); });
