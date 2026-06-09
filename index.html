@@ -118,6 +118,8 @@ textarea.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-siz
   .alerta-body{grid-template-columns:1fr}
   .alerta-col+.alerta-col{border-left:none;border-top:1px solid var(--border)}
 }
+.mesclar-item{padding:10px 14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;margin-bottom:8px;background:var(--surface2);transition:border-color .15s}
+.mesclar-item:hover{border-color:var(--accent);background:var(--surface)}
 </style>
 </head>
 <body>
@@ -921,6 +923,7 @@ async function carregarAlertas() {
     if (!r.ok) throw new Error('status '+r.status);
     var data = await r.json();
     alertasData = data.ofertas || [];
+    window._alertasCache = alertasData;
     renderAlertas(data);
     atualizarBadge();
   } catch(e) {
@@ -995,6 +998,7 @@ function renderAlertaCard(o) {
     +'</div>'
     +'<div class="alerta-footer">'
     +'<button class="btn btn-aprovar" style="flex:1;padding:10px" onclick="aprovarAlerta('+o.id+')">✓ Aprovar e enviar</button>'
+    +'<button class="btn" style="flex:0 0 auto;padding:10px 16px;background:#7c3aed;color:#fff" onclick="abrirMesclar('+o.id+')">🔗 Mesclar</button>'
     +'<button class="btn btn-rejeitar" style="flex:0 0 auto;padding:10px 16px" onclick="rejeitarAlerta('+o.id+')">Rejeitar</button>'
     +'<span class="alerta-fb" id="alerta-fb-'+o.id+'"></span>'
     +'</div>'
@@ -1051,6 +1055,63 @@ async function rejeitarAlerta(id) {
       setTimeout(carregarAlertas, 1000);
     }
   } catch(e) { fb.style.color='#ff585e'; fb.textContent='Sem resposta.'; }
+}
+
+// ══ MESCLAR OFERTAS ══
+var mesclarIdBase = null;
+
+function abrirMesclar(id) {
+  mesclarIdBase = id;
+  // Buscar outras ofertas pendentes para escolher
+  var modal = document.getElementById('modal-mesclar');
+  var lista  = document.getElementById('mesclar-lista');
+  var ofertas = window._alertasCache || [];
+  var outras = ofertas.filter(function(o){ return o.id !== id && o.status === 'pendente'; });
+  if (outras.length === 0) {
+    alert('Nenhuma outra oferta pendente para mesclar.');
+    return;
+  }
+  lista.innerHTML = outras.map(function(o) {
+    var resumo = (o.mensagemFormatada || o.conteudoOriginal || '').toString().slice(0,120).replace(/</g,'&lt;');
+    return '<div class="mesclar-item" onclick="confirmarMesclar('+o.id+')" title="Clique para mesclar com esta oferta">'
+      + '<span style="color:var(--accent);font-size:11px;font-weight:700">ID '+o.id+'</span> '
+      + '<span style="color:var(--fg2);font-size:12px">'+resumo+'...</span>'
+      + '</div>';
+  }).join('');
+  modal.style.display = 'flex';
+}
+
+function fecharMesclar() {
+  document.getElementById('modal-mesclar').style.display = 'none';
+  mesclarIdBase = null;
+}
+
+async function confirmarMesclar(id2) {
+  if (!mesclarIdBase) return;
+  var id1 = mesclarIdBase;
+  fecharMesclar();
+  try {
+    var r = await fetch(SERVER+'/painel/mesclar', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id1: id1, id2: id2 })
+    });
+    var d = await r.json();
+    if (d.ok) {
+      // Atualizar o textarea da oferta base com a mensagem mesclada
+      var ta = document.getElementById('alerta-msg-'+id1);
+      if (ta) ta.value = d.mensagemMesclada;
+      // Marcar a segunda oferta como mesclada visualmente
+      var card2 = document.getElementById('alerta-card-'+id2);
+      if (card2) { card2.style.opacity='.2'; card2.style.pointerEvents='none'; }
+      // Mostrar feedback
+      var fb = document.getElementById('alerta-fb-'+id1);
+      if (fb) { fb.style.color='#7c3aed'; fb.textContent='\u2713 Mesclado! Revise e aprove.'; }
+      setTimeout(carregarAlertas, 2000);
+    } else {
+      alert('Erro ao mesclar: ' + (d.erro || 'desconhecido'));
+    }
+  } catch(e) { alert('Erro de conex\u00e3o ao mesclar.'); }
 }
 
 function escapeHtml(str) {
@@ -1191,5 +1252,17 @@ window.addEventListener('DOMContentLoaded', function() {
   setInterval(verificarServidor, 5000);
 });
 </script>
+
+<!-- Modal Mesclar Ofertas -->
+<div id="modal-mesclar" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;max-width:560px;width:100%;max-height:80vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="margin:0;font-size:15px;color:var(--fg)">🔗 Mesclar com qual oferta?</h3>
+      <button onclick="fecharMesclar()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1">×</button>
+    </div>
+    <p style="font-size:12px;color:var(--muted2);margin:0 0 14px">Selecione a segunda oferta para combinar. As mensagens formatadas serão unidas e você poderá revisar antes de aprovar.</p>
+    <div id="mesclar-lista"></div>
+  </div>
+</div>
 </body>
 </html>
