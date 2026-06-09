@@ -539,9 +539,12 @@ async function chamarIA(messages, useSearch) {
     body.messages = body.messages.concat([{role:'assistant',content:data.content},{role:'user',content:results}]);
   }
   text = text.replace(/```json\s*/gi,'').replace(/```\s*/gi,'').trim();
+  console.log('[IA raw] tamanho='+text.length+' inicio='+text.substring(0,100));
   var match = text.match(/\[[\s\S]*\]/) || text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error('JSON não encontrado: '+text.substring(0,200));
-  return JSON.parse(match[0]);
+  var parsed = JSON.parse(match[0]);
+  console.log('[IA parsed]', JSON.stringify(parsed).substring(0,300));
+  return parsed;
 }
 
 // ══ ANALISAR OFERTA ══
@@ -998,6 +1001,7 @@ function renderAlertaCard(o) {
     +'</div>'
     +'<div class="alerta-footer">'
     +'<button class="btn btn-aprovar" style="flex:1;padding:10px" onclick="aprovarAlerta('+o.id+')">✓ Aprovar e enviar</button>'
+    +'<button class="btn" style="flex:0 0 auto;padding:10px 16px;background:#0ea5e9;color:#fff" onclick="reprocessarAlerta('+o.id+')">🔄 Reprocessar</button>'
     +'<button class="btn" style="flex:0 0 auto;padding:10px 16px;background:#7c3aed;color:#fff" onclick="abrirMesclar('+o.id+')">🔗 Mesclar</button>'
     +'<button class="btn btn-rejeitar" style="flex:0 0 auto;padding:10px 16px" onclick="rejeitarAlerta('+o.id+')">Rejeitar</button>'
     +'<span class="alerta-fb" id="alerta-fb-'+o.id+'"></span>'
@@ -1055,6 +1059,29 @@ async function rejeitarAlerta(id) {
       setTimeout(carregarAlertas, 1000);
     }
   } catch(e) { fb.style.color='#ff585e'; fb.textContent='Sem resposta.'; }
+}
+
+// ══ REPROCESSAR OFERTA ══
+async function reprocessarAlerta(id) {
+  var fb = document.getElementById('alerta-fb-'+id);
+  var btn = document.querySelector('[onclick="reprocessarAlerta('+id+')"]');
+  if (fb) { fb.style.color='var(--muted2)'; fb.textContent='Reprocessando...'; }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  try {
+    var r = await fetch(SERVER+'/painel/reprocessar/'+id, { method:'POST' });
+    var d = await r.json();
+    if (d.ok) {
+      var ta = document.getElementById('alerta-msg-'+id);
+      if (ta) ta.value = d.mensagemFormatada;
+      if (fb) { fb.style.color='#0ea5e9'; fb.textContent='✓ Reprocessado! Revise e aprove.'; }
+    } else {
+      if (fb) { fb.style.color='#ff585e'; fb.textContent='Erro: '+(d.erro||'desconhecido'); }
+    }
+  } catch(e) {
+    if (fb) { fb.style.color='#ff585e'; fb.textContent='Sem resposta.'; }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Reprocessar'; }
+  }
 }
 
 // ══ MESCLAR OFERTAS ══
