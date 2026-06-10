@@ -901,7 +901,10 @@ async function enviarEmissao(idx) {
       r=await fetch(SERVER+'/enviar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mensagem:texto,grupo:GRUPO_EMISSAO})});
     }
     var d=await r.json();
-    if (d.ok){s.style.color='#4ade80';s.textContent='✓ Enviado!';setTimeout(function(){s.textContent='';},4000);}
+    if (d.ok){
+      if (d.posicao > 0){s.style.color='#f59e0b';s.textContent='⏳ Na fila (pos. '+d.posicao+' — ~'+d.tempoMin+' min)';setTimeout(function(){s.textContent='';},10000);}
+      else{s.style.color='#4ade80';s.textContent='✓ Enviado!';setTimeout(function(){s.textContent='';},4000);}
+    }
     else{s.style.color='#ff585e';s.textContent='Erro: '+(d.erro||'falha');setTimeout(function(){s.textContent='';},5000);}
     if (d.ok&&imgVolta) {
       var fd2=new FormData();
@@ -1036,9 +1039,14 @@ async function aprovarAlerta(id) {
     });
     var d = await r.json();
     if (d.ok) {
-      fb.style.color='#22c55e'; fb.textContent='✓ Enviado!';
       var card = document.getElementById('alerta-card-'+id);
       if (card) { card.style.opacity='.35'; card.style.pointerEvents='none'; }
+      if (d.posicao > 0) {
+        fb.style.color='#f59e0b';
+        fb.textContent='⏳ Na fila (pos. '+d.posicao+' — envio em ~'+d.tempoMin+' min)';
+      } else {
+        fb.style.color='#22c55e'; fb.textContent='✓ Enviado!';
+      }
       setTimeout(carregarAlertas, 1500);
     } else {
       fb.style.color='#ff585e'; fb.textContent='Erro: '+(d.erro||'falha');
