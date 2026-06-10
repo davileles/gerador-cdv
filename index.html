@@ -1064,9 +1064,11 @@ async function rejeitarAlerta(id) {
       fb.style.color='var(--muted2)'; fb.textContent='Rejeitado';
       var card = document.getElementById('alerta-card-'+id);
       if (card) { card.style.opacity='.25'; card.style.pointerEvents='none'; }
-      setTimeout(carregarAlertas, 1000);
+      setTimeout(carregarAlertas, 1500);
+    } else {
+      fb.style.color='#ff585e'; fb.textContent='Erro: '+(d.erro||'falha (status '+r.status+')');
     }
-  } catch(e) { fb.style.color='#ff585e'; fb.textContent='Sem resposta.'; }
+  } catch(e) { fb.style.color='#ff585e'; fb.textContent='Erro: '+e.message; }
 }
 
 // ══ REPROCESSAR OFERTA ══
