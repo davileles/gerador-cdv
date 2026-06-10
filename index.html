@@ -289,6 +289,11 @@ textarea.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-siz
 
 <!-- ══ PAINEL ALERTAS ══ -->
 <div class="main-panel" id="panel-alertas">
+  <!-- Barra de ações -->
+  <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+    <button id="btn-limpar-fila" class="btn" style="background:#3f3f3f;color:#aaa;font-size:12px;padding:7px 14px" onclick="limparFila()">🗑️ Limpar fila pendente</button>
+    <span id="limpar-fb" style="font-size:12px;color:var(--muted2);margin-left:10px;align-self:center"></span>
+  </div>
   <div id="alertas-buffer-bar" style="display:none" class="alerta-buffer">
     <span class="spin">⏳</span>
     <span id="alertas-buffer-txt">0 item(s) aguardando janela de 3 min...</span>
@@ -1069,6 +1074,27 @@ async function rejeitarAlerta(id) {
       fb.style.color='#ff585e'; fb.textContent='Erro: '+(d.erro||'falha (status '+r.status+')');
     }
   } catch(e) { fb.style.color='#ff585e'; fb.textContent='Erro: '+e.message; }
+}
+
+// ══ LIMPAR FILA ══
+async function limparFila() {
+  var fb = document.getElementById('limpar-fb');
+  if (!confirm('Isso vai rejeitar TODAS as ofertas pendentes. Confirma?')) return;
+  fb.style.color='var(--muted2)'; fb.textContent='Limpando...';
+  try {
+    var r = await fetch(SERVER+'/painel/limpar', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ confirmar:'sim' })
+    });
+    var d = await r.json();
+    if (d.ok) {
+      fb.style.color='#4ade80'; fb.textContent='✓ Fila limpa!';
+      setTimeout(carregarAlertas, 800);
+    } else {
+      fb.style.color='#ff585e'; fb.textContent='Erro: '+(d.erro||'desconhecido');
+    }
+  } catch(e) { fb.style.color='#ff585e'; fb.textContent='Sem resposta.'; }
 }
 
 // ══ REPROCESSAR OFERTA ══
