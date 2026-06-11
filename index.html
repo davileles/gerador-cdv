@@ -15,8 +15,7 @@
   --r:10px;--font:'Montserrat',sans-serif;
 }
 body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:2.5rem 1rem 4rem}
-.wrap{width:100%;max-width:580px;transition:max-width .25s}
-.wrap.alertas-ativo{max-width:1100px}
+.wrap{width:100%;max-width:1100px}
 header{margin-bottom:2rem}
 .logo-row{display:flex;align-items:center;gap:14px;margin-bottom:6px}
 .logo-bird{width:56px;height:56px;flex-shrink:0;object-fit:contain}
@@ -355,8 +354,6 @@ function switchMain(name) {
     document.getElementById('tab-'+id).classList.toggle('active', id===name);
     document.getElementById('panel-'+id).classList.toggle('active', id===name);
   });
-  var wrap = document.querySelector('.wrap');
-  if (wrap) wrap.classList.toggle('alertas-ativo', name === 'alertas');
   if (name === 'alertas') carregarAlertas();
 }
 
