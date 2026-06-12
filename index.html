@@ -120,6 +120,13 @@ textarea.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-siz
 }
 .mesclar-item{padding:10px 14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;margin-bottom:8px;background:var(--surface2);transition:border-color .15s}
 .mesclar-item:hover{border-color:var(--accent);background:var(--surface)}
+.sched-row{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+.sched-row label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;white-space:nowrap}
+.sched-input{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:13px;font-weight:500;padding:8px 10px;outline:none;transition:border-color .15s;flex:1;min-width:180px}
+.sched-input:focus{border-color:var(--accent)}
+input[type="datetime-local"]::-webkit-calendar-picker-indicator{filter:invert(.5);cursor:pointer}
+.sched-clear{background:none;border:1px solid var(--border2);border-radius:6px;color:var(--muted2);font-size:11px;padding:4px 8px;cursor:pointer;white-space:nowrap;font-family:var(--font)}
+.sched-clear:hover{color:var(--text);border-color:var(--muted)}
 </style>
 </head>
 <body>
@@ -246,6 +253,11 @@ textarea.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-siz
     <div class="copy-wrap">
       <button class="btn btn-copy" id="o-copy-btn">Copiar para WhatsApp</button>
       <button class="btn btn-send" id="o-send-btn">⚡ Enviar no WhatsApp</button>
+      <div class="sched-row" id="o-sched-row">
+        <label>🕐 Agendar para</label>
+        <input type="datetime-local" id="o-sched-input" class="sched-input" title="Deixe vazio para enviar agora"/>
+        <button class="sched-clear" onclick="document.getElementById('o-sched-input').value=''">✕</button>
+      </div>
       <p class="ok" id="o-ok"></p>
       <p class="send-ok" id="o-send-ok"></p>
     </div>
@@ -805,6 +817,11 @@ function buildEmissaoFormHTML(obj, idx) {
     +'<div class="copy-wrap">'
     +'<button class="btn btn-copy" onclick="copiarEmissao('+idx+')">Copiar para WhatsApp</button>'
     +'<button class="btn btn-send" onclick="enviarEmissao('+idx+')">⚡ Enviar no WhatsApp</button>'
+    +'<div class="sched-row">'
+    +'<label>🕐 Agendar para</label>'
+    +'<input type="datetime-local" id="'+id+'-sched" class="sched-input" title="Deixe vazio para enviar agora"/>'
+    +'<button class="sched-clear" onclick="document.getElementById(\''+id+'-sched\').value=\'\'">✕</button>'
+    +'</div>'
     +'<p class="ok" id="'+id+'-ok"></p>'
     +'<p class="send-ok" id="'+id+'-send-ok"></p>'
     +'</div></div>';
@@ -892,10 +909,23 @@ async function enviarEmissao(idx) {
   var texto=editEl?editEl.value:'';
   var s=document.getElementById(id+'-send-ok');
   if (!wsConectado){s.style.color='#ff585e';s.textContent='Servidor desconectado.';setTimeout(function(){s.textContent='';},4000);return;}
-  s.style.color='#eeeeee';s.textContent='Enviando...';
+
+  // Verificar agendamento
+  var schedInput = document.getElementById(id+'-sched');
+  var agendarEm = schedInput && schedInput.value ? isoParaSP(schedInput.value) : null;
+
+  s.style.color='#eeeeee';s.textContent= agendarEm ? 'Agendando...' : 'Enviando...';
   var imgIda=emissoesPendentes[idx]&&emissoesPendentes[idx]['_imgSelecionada_ida'];
   var imgVolta=emissoesPendentes[idx]&&emissoesPendentes[idx]['_imgSelecionada_volta'];
   try {
+    var r;
+    if (agendarEm) {
+      r=await fetch(SERVER+'/enviar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mensagem:texto,grupo:GRUPO_EMISSAO,agendarEm:agendarEm})});
+      var d=await r.json();
+      if (d.ok){ s.style.color='#f59e0b'; s.textContent='🕐 Agendado para '+d.horario; if(schedInput) schedInput.value=''; setTimeout(function(){s.textContent='';},8000); }
+      else { s.style.color='#ff585e';s.textContent='Erro: '+(d.erro||'falha');setTimeout(function(){s.textContent='';},5000); }
+      return;
+    }
     var r;
     if (imgIda) {
       var fd=new FormData();
@@ -1014,6 +1044,13 @@ function renderAlertaCard(o) {
     +'<button class="btn btn-rejeitar" style="flex:0 0 auto;padding:10px 16px" onclick="rejeitarAlerta('+o.id+')">Rejeitar</button>'
     +'<span class="alerta-fb" id="alerta-fb-'+o.id+'"></span>'
     +'</div>'
+    +'<div style="padding:0 14px 12px;border-top:1px solid var(--border)">'
+    +'<div class="sched-row" style="margin-top:10px">'
+    +'<label>🕐 Agendar envio</label>'
+    +'<input type="datetime-local" id="alerta-sched-'+o.id+'" class="sched-input" title="Deixe vazio para enviar na aprovação"/>'
+    +'<button class="sched-clear" onclick="document.getElementById(\'alerta-sched-'+o.id+'\').value=\'\'">✕</button>'
+    +'</div>'
+    +'</div>'
     +'</div>';
 }
 
@@ -1036,19 +1073,25 @@ async function aprovarAlerta(id) {
   var fb = document.getElementById('alerta-fb-'+id);
   var msgEl = document.getElementById('alerta-msg-'+id);
   var mensagem = msgEl ? msgEl.value : '';
-  fb.style.color='var(--muted)'; fb.textContent='Enviando...';
+  var schedInput = document.getElementById('alerta-sched-'+id);
+  var agendarEm = schedInput && schedInput.value ? isoParaSP(schedInput.value) : null;
+  fb.style.color='var(--muted)'; fb.textContent = agendarEm ? 'Agendando...' : 'Enviando...';
   try {
+    var body = {mensagem:mensagem};
+    if (agendarEm) body.agendarEm = agendarEm;
     var r = await fetch(SERVER+'/painel/aprovar/'+id, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({mensagem:mensagem})
+      body:JSON.stringify(body)
     });
     var d = await r.json();
     if (d.ok) {
       var card = document.getElementById('alerta-card-'+id);
       if (card) { card.style.opacity='.35'; card.style.pointerEvents='none'; }
-      if (d.posicao > 0) {
+      if (d.agendado) {
+        fb.style.color='#f59e0b'; fb.textContent='🕐 Agendado para '+d.horario;
+      } else if (d.posicao > 0) {
         fb.style.color='#f59e0b';
-        fb.textContent='⏳ Na fila (pos. '+d.posicao+' — envio em ~'+d.tempoMin+' min)';
+        fb.textContent='⏳ Na fila (pos. '+d.posicao+' — ~'+d.horario+')';
       } else {
         fb.style.color='#22c55e'; fb.textContent='✓ Enviado!';
       }
@@ -1183,6 +1226,32 @@ function escapeHtml(str) {
 }
 
 // ══ UTIL ══
+// Converte o valor de datetime-local (sem timezone) para ISO string interpretado como horário de SP
+function isoParaSP(dtLocal) {
+  // dtLocal = "2026-06-15T08:30" — interpretar como se fosse horário de Brasília/SP
+  // Calcula o offset de SP em relação a UTC no momento informado
+  var date = new Date(dtLocal); // interpreta como local do browser
+  // Reinterpretar como SP: formatar a string e criar com offset explícito
+  // SP usa UTC-3 (BRT) ou UTC-2 (BRST no verão, atualmente suspenso)
+  // Solução robusta: usar Intl para descobrir o offset no instante
+  var utc = new Date(dtLocal + 'Z'); // trata como UTC puro
+  var spStr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false
+  }).format(utc);
+  // spStr = "2026-06-15, 08:30:00" — offset entre UTC e SP nesse instante
+  var utcMs = utc.getTime();
+  var spDate = new Date(spStr.replace(', ',' ').replace(/(\d{2}):(\d{2}):(\d{2})$/, '$1:$2:$3'));
+  var offsetMs = utcMs - spDate.getTime(); // offset SP→UTC em ms
+  // Hora local digitada deve ser SP, então o UTC equivalente é:
+  var localMs = new Date(dtLocal).getTime(); // ms ignorando timezone
+  // Recriar como UTC ajustado para SP
+  var spOffset = -3 * 3600000; // SP é UTC-3 (simplificado, sem BRST)
+  var isoFinal = new Date(localMs - spOffset).toISOString();
+  return isoFinal;
+}
+
 function hoje(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 
 function mostrar(msgId,cardId,okId,msg) {
@@ -1241,21 +1310,31 @@ async function enviarWA(msgId,statusId,fileKey) {
   var texto=editEl?editEl.value:'';
   var s=document.getElementById(statusId);
   if (!wsConectado){s.style.color='#ff585e';s.textContent='Servidor desconectado.';setTimeout(function(){s.textContent='';},4000);return;}
-  s.style.color='#eeeeee';s.textContent='Enviando...';
+
+  // Verificar agendamento
+  var schedInput = document.getElementById(fileKey==='o' ? 'o-sched-input' : fileKey+'-sched');
+  var agendarEm = schedInput && schedInput.value ? isoParaSP(schedInput.value) : null;
+
+  s.style.color='#eeeeee';s.textContent= agendarEm ? 'Agendando...' : 'Enviando...';
   var grupo=fileKey==='o'?GRUPO_OFERTA:GRUPO_EMISSAO;
   try {
     var file=fileKey==='o'?pastedFile:mPastedFile;
     var imgInput=document.getElementById(fileKey+'-img-input');
     if (imgInput&&imgInput.files[0]) file=imgInput.files[0];
     var r;
-    if (file) {
+    if (file && !agendarEm) {
       var fd=new FormData();fd.append('imagem',file);fd.append('legenda',texto);fd.append('grupo',grupo);
       r=await fetch(SERVER+'/enviar-imagem',{method:'POST',body:fd});
     } else {
-      r=await fetch(SERVER+'/enviar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mensagem:texto,grupo:grupo})});
+      var body = {mensagem:texto,grupo:grupo};
+      if (agendarEm) body.agendarEm = agendarEm;
+      r=await fetch(SERVER+'/enviar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     }
     var d=await r.json();
-    if (d.ok){s.style.color='#4ade80';s.textContent='✓ Enviado!';setTimeout(function(){s.textContent='';},4000);}
+    if (d.ok){
+      if (d.agendado){ s.style.color='#f59e0b'; s.textContent='🕐 Agendado para '+d.horario; if(schedInput) schedInput.value=''; setTimeout(function(){s.textContent='';},8000); }
+      else { s.style.color='#4ade80';s.textContent='✓ Enviado!';setTimeout(function(){s.textContent='';},4000); }
+    }
     else{s.style.color='#ff585e';s.textContent='Erro: '+(d.erro||'falha');setTimeout(function(){s.textContent='';},5000);}
   } catch(e){s.style.color='#ff585e';s.textContent='Sem resposta.';setTimeout(function(){s.textContent='';},4000);}
 }
