@@ -926,27 +926,14 @@ async function enviarEmissao(idx) {
       else { s.style.color='#ff585e';s.textContent='Erro: '+(d.erro||'falha');setTimeout(function(){s.textContent='';},5000); }
       return;
     }
-    var r;
-    if (imgIda) {
-      var fd=new FormData();
-      var fileIda=imgIda.file||dataURLtoFile(imgIda.src,'ida.jpg');
-      fd.append('imagem',fileIda);fd.append('legenda',texto);fd.append('grupo',GRUPO_EMISSAO);
-      r=await fetch(SERVER+'/enviar-imagem',{method:'POST',body:fd});
-    } else {
-      r=await fetch(SERVER+'/enviar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mensagem:texto,grupo:GRUPO_EMISSAO})});
-    }
+    // cdv_emissao: sempre envia só texto, nunca imagem
+    r=await fetch(SERVER+'/enviar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mensagem:texto,grupo:GRUPO_EMISSAO})});
     var d=await r.json();
     if (d.ok){
       if (d.posicao > 0){s.style.color='#f59e0b';s.textContent='⏳ Na fila (pos. '+d.posicao+' — ~'+d.tempoMin+' min)';setTimeout(function(){s.textContent='';},10000);}
       else{s.style.color='#4ade80';s.textContent='✓ Enviado!';setTimeout(function(){s.textContent='';},4000);}
     }
     else{s.style.color='#ff585e';s.textContent='Erro: '+(d.erro||'falha');setTimeout(function(){s.textContent='';},5000);}
-    if (d.ok&&imgVolta) {
-      var fd2=new FormData();
-      var fileVolta=imgVolta.file||dataURLtoFile(imgVolta.src,'volta.jpg');
-      fd2.append('imagem',fileVolta);fd2.append('legenda','');fd2.append('grupo',GRUPO_EMISSAO);
-      await fetch(SERVER+'/enviar-imagem',{method:'POST',body:fd2});
-    }
   } catch(e){s.style.color='#ff585e';s.textContent='Erro: '+e.message;}
 }
 
