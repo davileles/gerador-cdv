@@ -1319,11 +1319,11 @@ function montarMensagemRadar(o) {
   if (o.cupom) msg += '🏷️ *CUPOM* ' + o.cupom + '\n\n';
   if (o.importante) msg += '⚠️ *IMPORTANTE* ' + stripEmojis(o.importante) + '\n\n';
 
-  // Prazo e Link no formato limpo (bold simples, sem emoji)
+  // Prazo e Link com emojis padrão
   if (o.prazo && o.prazo.toLowerCase() !== 'não informado' && o.prazo !== '') {
-    msg += '*Prazo:* ' + o.prazo + '\n\n';
+    msg += '📆 *PRAZO* ' + o.prazo + '\n\n';
   }
-  msg += '*Link:* ' + (o.link || '—') + '\n\n';
+  msg += '🔗 *LINK* ' + (o.link || '—') + '\n\n';
   msg += RODAPE_OFERTA;
   return msg;
 }
@@ -1340,8 +1340,6 @@ async function aprovarOfertaPendente(id) {
     var d = await r.json();
     if (d.ok) {
       fb.style.color='#22c55e'; fb.textContent='✓ Aprovada! Enviando para o WhatsApp...';
-      var card = document.getElementById('oferta-card-'+id);
-      if (card) { card.style.opacity='.35'; card.style.pointerEvents='none'; }
 
       // Captura o objeto original ANTES de remover do array
       var ofertaOriginal = ofertasPendentesData.find(function(o){return o.id===id;}) || {};
@@ -1366,6 +1364,15 @@ async function aprovarOfertaPendente(id) {
       } catch(ew) {
         fb.style.color='#f97316'; fb.textContent='✓ Aprovada (WhatsApp offline: '+ew.message+')';
       }
+      // Remove o card da tela após 1.5s
+      var card = document.getElementById('oferta-card-'+id);
+      if (card) {
+        setTimeout(function() {
+          card.style.transition = 'opacity .4s';
+          card.style.opacity = '0';
+          setTimeout(function() { card.remove(); }, 420);
+        }, 1500);
+      }
     } else {
       fb.style.color='#ff585e'; fb.textContent='Erro: '+(d.erro||'falha');
     }
@@ -1383,10 +1390,16 @@ async function rejeitarOfertaPendente(id) {
     var d = await r.json();
     if (d.ok) {
       fb.style.color='var(--muted2)'; fb.textContent='Rejeitada (bloqueada)';
-      var card = document.getElementById('oferta-card-'+id);
-      if (card) { card.style.opacity='.25'; card.style.pointerEvents='none'; }
       ofertasPendentesData = ofertasPendentesData.filter(function(o){return o.id!==id;});
       atualizarBadgeOfertas();
+      var card = document.getElementById('oferta-card-'+id);
+      if (card) {
+        setTimeout(function() {
+          card.style.transition = 'opacity .4s';
+          card.style.opacity = '0';
+          setTimeout(function() { card.remove(); }, 420);
+        }, 800);
+      }
     } else {
       fb.style.color='#ff585e'; fb.textContent='Erro: '+(d.erro||'falha');
     }
