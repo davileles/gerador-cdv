@@ -1373,6 +1373,12 @@ async function aprovarOfertaPendente(id) {
           setTimeout(function() { card.remove(); }, 420);
         }, 1500);
       }
+    } else if (r.status === 404) {
+      fb.style.color='#f97316'; fb.textContent='Já processada em outra sessão — removida da lista';
+      ofertasPendentesData = ofertasPendentesData.filter(function(o){return o.id!==id;});
+      atualizarBadgeOfertas();
+      var card2 = document.getElementById('oferta-card-'+id);
+      if (card2) { setTimeout(function(){ card2.style.transition='opacity .4s'; card2.style.opacity='0'; setTimeout(function(){card2.remove();},420); }, 1000); }
     } else {
       fb.style.color='#ff585e'; fb.textContent='Erro: '+(d.erro||'falha');
     }
@@ -1380,16 +1386,16 @@ async function aprovarOfertaPendente(id) {
 }
 
 async function rejeitarOfertaPendente(id) {
-  var fb = document.getElementById('oferta-fb-'+id);
-  fb.style.color='var(--muted)'; fb.textContent='Rejeitando...';
   try {
     var r = await fetch(CDV_PROXY+'/ofertas/rejeitar', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({id:id})
     });
     var d = await r.json();
-    if (d.ok) {
-      fb.style.color='var(--muted2)'; fb.textContent='Rejeitada (bloqueada)';
+    if (d.ok || r.status === 404) {
+      // 404 = já foi processada em outra sessão — remove da UI de qualquer forma
+      fb.style.color='var(--muted2)';
+      fb.textContent = d.ok ? 'Rejeitada (bloqueada)' : 'Já processada — removida da lista';
       ofertasPendentesData = ofertasPendentesData.filter(function(o){return o.id!==id;});
       atualizarBadgeOfertas();
       var card = document.getElementById('oferta-card-'+id);
