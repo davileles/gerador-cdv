@@ -510,9 +510,10 @@ REGRAS GERAIS:
 
 COMPRA BONIFICADA (oferta onde se ganha pontos/milhas OU cashback por real ou dólar gasto em parceiro):
 - "titulo": template exato: "[X] pontos por [real/dólar] entre [Parceiro] e [Programa]" para pontos, ou "[X]% de cashback em [Parceiro]" para cashback. Use "Até" só se houver variação.
-- Se a imagem contiver MÚLTIPLAS ofertas em lista, extraia a de MAIOR percentual/destaque como oferta principal e liste as demais no "resumo".
+- Se o conteúdo contiver MÚLTIPLAS lojas/parceiros com pontuações diferentes (ex: tabela de parceiros), use o parceiro de MAIOR pontuação no título. No campo "loja", liste TODOS os parceiros separados por vírgula. No campo "restricoes", liste CADA parceiro com sua pontuação individual no formato "NomeLoja: X pts/R$" — um item por parceiro, ordenado do maior para o menor. Inclua prazo específico de cada parceiro ao lado se houver (ex: "NomeLoja: X pts/R$ (até DD/MM)").
+- Se for oferta de parceiro único, use normalmente título com o nome da loja.
 - "importante": "Sempre verifique a necessidade de uso de cupom, formas de pagamento e produtos específicos participantes, além do prazo para receber os pontos. Recomendamos fortemente que todo processo seja gravado para possível reclamação futura. Sem a gravação você não obterá os pontos se eles não forem creditados corretamente."
-- "loja": nome do parceiro/ecommerce
+- "loja": nome do parceiro principal (maior pontuação) ou lista de parceiros separados por vírgula se múltiplos
 - "cupom": código principal se houver, senão vazio
 
 COMPRA DE PONTOS ou TRANSFERÊNCIA COM BÔNUS:
