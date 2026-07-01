@@ -713,9 +713,28 @@ async function analisarOferta() {
       document.getElementById('o-restricoes').value=obj.restricoes.join('\n');
     }
     if (!obj.link && currentMode==='link') document.getElementById('o-link').value=document.getElementById('url-input').value.trim();
-    if (obj.prazo && obj.prazo.includes('/')) {
-      var pp=obj.prazo.split('/');
-      if (pp.length===2) { var ano=new Date().getFullYear(); document.getElementById('o-prazo').value=ano+'-'+pp[1].padStart(2,'0')+'-'+pp[0].padStart(2,'0'); }
+    if (obj.prazo && obj.prazo.trim()) {
+      var prazoStr = obj.prazo.trim();
+      var anoAtual = new Date().getFullYear();
+      var dia='', mes='', ano='';
+      // Formato DD/MM/AAAA
+      var m3 = prazoStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (m3) { dia=m3[1]; mes=m3[2]; ano=m3[3]; }
+      // Formato DD/MM (sem ano)
+      else {
+        var m2 = prazoStr.match(/(\d{1,2})\/(\d{1,2})/);
+        if (m2) { dia=m2[1]; mes=m2[2]; ano=anoAtual; }
+      }
+      // Formato textual: "5 de julho de 2026", "05/jul", etc.
+      if (!dia) {
+        var MESES = {jan:1,fev:2,'mar':3,abr:4,mai:5,jun:6,jul:7,ago:8,set:9,out:10,nov:11,dez:12,janeiro:1,fevereiro:2,'março':3,marco:3,abril:4,maio:5,junho:6,julho:7,agosto:8,setembro:9,outubro:10,novembro:11,dezembro:12};
+        var mt = prazoStr.toLowerCase().match(/(\d{1,2})\s+de\s+([a-zçã]+)(?:\s+de\s+(\d{4}))?/);
+        if (mt && MESES[mt[2]]) { dia=mt[1]; mes=MESES[mt[2]]; ano=mt[3]||anoAtual; }
+      }
+      if (dia && mes) {
+        var d = String(dia).padStart(2,'0'), mm = String(mes).padStart(2,'0');
+        document.getElementById('o-prazo').value = ano+'-'+mm+'-'+d;
+      }
     }
     okEl.style.color='#4ade80'; okEl.textContent='✓ Campos preenchidos! Revise antes de gerar.';
   } catch(e) {
