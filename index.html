@@ -253,6 +253,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator{filter:invert(.5
       <label>Link da oferta</label>
       <input type="text" id="o-link" placeholder="https://..."/>
     </div>
+    <input type="hidden" id="o-categoria" value="geral"/>
   </div>
 
   <div class="img-upload">
@@ -528,7 +529,7 @@ LINK: use sempre o link oficial da oferta (sem parâmetros UTM). Procure hrefs p
 Fallbacks por programa: Livelo→https://www.livelo.com.br, Smiles→https://www.smiles.com.br/home, LATAM Pass→https://www.latamairlines.com/br/pt, Azul Fidelidade→https://www.voeazul.com.br/br/pt/home, Esfera→https://www.esfera.com.vc, Iberia→https://www.iberia.com, TAP→https://www.flytap.com, AAdvantage→https://www.aa.com.br.
 
 Responda SOMENTE com este JSON (todos os campos sempre presentes, mesmo que vazios):
-{"titulo":"","resumo":"2 a 3 frases resumindo a oportunidade","programa":"nome do(s) programa(s)","bonus":"valor do bônus de forma objetiva","descricao":"","prazo":"DD/MM ou vazio","loja":"","cupom":"","link":"","importante":"","milheiro":"","tetoTransferencia":"","restricoes":["condição 1","condição 2"]}`;
+{"titulo":"","resumo":"2 a 3 frases resumindo a oportunidade","programa":"nome do(s) programa(s)","bonus":"valor do bônus de forma objetiva","descricao":"","prazo":"DD/MM/AAAA ou vazio","loja":"","cupom":"","link":"","importante":"","milheiro":"","tetoTransferencia":"","categoria":"transferencia|compra|compra_bonificada|clube|cartao|geral","restricoes":["condição 1","condição 2"]}`;
 }
 
 // ══ PROMPT MILHAS ══
@@ -666,7 +667,7 @@ async function analisarOferta() {
     obj.titulo=normalizarParceiros(obj.titulo); obj.descricao=normalizarParceiros(obj.descricao);
     obj.loja=normalizarParceiros(obj.loja); obj.cupom=normalizarParceiros(obj.cupom);
     obj.importante=normalizarParceiros(obj.importante); obj.link=normalizarParceiros(obj.link);
-    ['o-titulo','o-corpo','o-prazo','o-loja','o-cupom','o-importante','o-link','o-programa','o-bonus','o-milheiro','o-teto','o-restricoes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+    ['o-titulo','o-corpo','o-prazo','o-loja','o-cupom','o-importante','o-link','o-programa','o-bonus','o-milheiro','o-teto','o-restricoes','o-categoria'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=id==='o-categoria'?'geral':''; });
     if (obj.titulo)     document.getElementById('o-titulo').value=obj.titulo;
     if (obj.resumo)     document.getElementById('o-corpo').value=obj.resumo;
     else if (obj.descricao) document.getElementById('o-corpo').value=obj.descricao;
@@ -678,6 +679,7 @@ async function analisarOferta() {
     if (obj.bonus)      document.getElementById('o-bonus').value=obj.bonus;
     if (obj.milheiro)   document.getElementById('o-milheiro').value=obj.milheiro;
     if (obj.tetoTransferencia) document.getElementById('o-teto').value=obj.tetoTransferencia;
+    if (obj.categoria)  { var cEl=document.getElementById('o-categoria'); if(cEl) cEl.value=obj.categoria; }
     if (obj.restricoes && Array.isArray(obj.restricoes) && obj.restricoes.length) {
       document.getElementById('o-restricoes').value=obj.restricoes.join('\n');
     }
@@ -1703,7 +1705,41 @@ async function enviarWA(msgId,statusId,fileKey) {
     var d=await r.json();
     if (d.ok){
       if (d.agendado){ s.style.color='#f59e0b'; s.textContent='🕐 Agendado para '+d.horario; if(schedInput) schedInput.value=''; setTimeout(function(){s.textContent='';},8000); }
-      else { s.style.color='#4ade80';s.textContent='✓ Enviado!';setTimeout(function(){s.textContent='';},4000); }
+      else {
+        s.style.color='#4ade80'; s.textContent='✓ Enviado!';
+        // Se for aba Oferta, publica também no Radar
+        if (fileKey === 'o') {
+          var EMOJI_CAT = {transferencia:'🔄',compra:'💰',compra_bonificada:'🛍️',clube:'🎫',cartao:'💳',geral:'📰'};
+          var cat = (document.getElementById('o-categoria')||{value:'geral'}).value || 'geral';
+          var restricoesTxtR = (document.getElementById('o-restricoes')||{value:''}).value.trim();
+          var ofertaPayload = {
+            titulo:    (document.getElementById('o-titulo')||{value:''}).value.trim(),
+            emoji:     EMOJI_CAT[cat] || '📰',
+            resumo:    (document.getElementById('o-corpo')||{value:''}).value.trim(),
+            programa:  (document.getElementById('o-programa')||{value:''}).value.trim(),
+            bonus:     (document.getElementById('o-bonus')||{value:''}).value.trim(),
+            prazo:     (function(){ var p=(document.getElementById('o-prazo')||{value:''}).value; if(!p)return''; var pp=p.split('-'); return pp.length===3?pp[2]+'/'+pp[1]+'/'+pp[0]:''; })(),
+            categoria: cat,
+            loja:      (document.getElementById('o-loja')||{value:''}).value.trim(),
+            cupom:     (document.getElementById('o-cupom')||{value:''}).value.trim(),
+            importante:(document.getElementById('o-importante')||{value:''}).value.trim(),
+            milheiro:  (document.getElementById('o-milheiro')||{value:''}).value.trim(),
+            tetoTransferencia:(document.getElementById('o-teto')||{value:''}).value.trim(),
+            link:      (document.getElementById('o-link')||{value:''}).value.trim(),
+            restricoes: restricoesTxtR ? restricoesTxtR.split('\n').map(function(x){return x.trim();}).filter(Boolean) : []
+          };
+          if (ofertaPayload.titulo) {
+            fetch(CDV_PROXY+'/ofertas/publicar', {
+              method:'POST', headers:{'Content-Type':'application/json'},
+              body: JSON.stringify(ofertaPayload)
+            }).then(function(rp){ return rp.json(); }).then(function(dp){
+              if (dp.ok) { s.textContent='✓ Enviado e publicado no Radar!'; }
+              else { console.warn('[Radar] Falha ao publicar:', dp.erro); }
+            }).catch(function(ep){ console.warn('[Radar] Erro ao publicar:', ep.message); });
+          }
+        }
+        setTimeout(function(){s.textContent='';},5000);
+      }
     }
     else{s.style.color='#ff585e';s.textContent='Erro: '+(d.erro||'falha');setTimeout(function(){s.textContent='';},5000);}
   } catch(e){s.style.color='#ff585e';s.textContent='Sem resposta.';setTimeout(function(){s.textContent='';},4000);}
