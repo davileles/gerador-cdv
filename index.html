@@ -1220,6 +1220,34 @@ function coletarEdicoesOferta(id) {
   };
 }
 
+function montarMensagemRadar(o) {
+  var msg = '';
+  if (o.titulo) msg += '*' + o.titulo + '*\n\n';
+
+  // Corpo: resumo + custo do milheiro + teto de bônus + restrições
+  var corpo = '';
+  if (o.resumo) corpo += o.resumo + '\n\n';
+  if (o.milheiro) corpo += o.milheiro.split('\n').map(function(l){return l.trim();}).filter(Boolean).join('\n') + '\n\n';
+  if (o.tetoTransferencia) corpo += o.tetoTransferencia.split('\n').map(function(l){return l.trim();}).filter(Boolean).join('\n') + '\n\n';
+  if (o.restricoes && o.restricoes.length) corpo += o.restricoes.join('\n') + '\n\n';
+  if (corpo) msg += corpo;
+
+  // Prazo
+  if (o.prazo && o.prazo.toLowerCase() !== 'não informado' && o.prazo !== '') {
+    msg += '📆 *PRAZO* ' + o.prazo + '\n\n';
+  }
+  // Loja
+  if (o.loja) msg += '🛒 *LOJA* ' + o.loja + '\n\n';
+  // Cupom
+  if (o.cupom) msg += '🏷️ *CUPOM* ' + o.cupom + '\n\n';
+  // Importante
+  if (o.importante) msg += '⚠️ *IMPORTANTE* ' + o.importante + '\n\n';
+  // Link
+  msg += '🔗 *LINK* ' + (o.link || '—') + '\n\n';
+  msg += RODAPE_OFERTA;
+  return msg;
+}
+
 async function aprovarOfertaPendente(id) {
   var fb = document.getElementById('oferta-fb-'+id);
   fb.style.color='var(--muted)'; fb.textContent='Aprovando...';
@@ -1231,11 +1259,32 @@ async function aprovarOfertaPendente(id) {
     });
     var d = await r.json();
     if (d.ok) {
-      fb.style.color='#22c55e'; fb.textContent='✓ Aprovada!';
+      fb.style.color='#22c55e'; fb.textContent='✓ Aprovada! Enviando para o WhatsApp...';
       var card = document.getElementById('oferta-card-'+id);
       if (card) { card.style.opacity='.35'; card.style.pointerEvents='none'; }
+
+      // Captura o objeto original ANTES de remover do array
+      var ofertaOriginal = ofertasPendentesData.find(function(o){return o.id===id;}) || {};
+      var ofertaEditada = Object.assign({}, ofertaOriginal, edits);
       ofertasPendentesData = ofertasPendentesData.filter(function(o){return o.id!==id;});
       atualizarBadgeOfertas();
+
+      // Monta e envia a mensagem para o grupo de ofertas do WhatsApp
+      var mensagem = montarMensagemRadar(ofertaEditada);
+      try {
+        var rw = await fetch(SERVER+'/enviar', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ mensagem: mensagem, grupo: '120363409136599326' })
+        });
+        var dw = await rw.json();
+        if (dw.ok || dw.status === 'ok') {
+          fb.style.color='#22c55e'; fb.textContent='✓ Aprovada e enviada para o WhatsApp!';
+        } else {
+          fb.style.color='#f97316'; fb.textContent='✓ Aprovada (WhatsApp: '+(dw.erro||dw.error||'falha')+')';
+        }
+      } catch(ew) {
+        fb.style.color='#f97316'; fb.textContent='✓ Aprovada (WhatsApp offline: '+ew.message+')';
+      }
     } else {
       fb.style.color='#ff585e'; fb.textContent='Erro: '+(d.erro||'falha');
     }
