@@ -508,8 +508,9 @@ REGRAS GERAIS:
 3. NUNCA mencione ou cite a fonte/blog de onde veio a informação.
 4. Retorne SOMENTE JSON válido, sem markdown, sem texto antes ou depois.
 
-COMPRA BONIFICADA (oferta onde se ganha pontos/milhas por real ou dólar gasto em parceiro):
-- "titulo": template exato: "[X] pontos por [real/dólar] entre [Parceiro] e [Programa]". Use "Até" só se houver variação.
+COMPRA BONIFICADA (oferta onde se ganha pontos/milhas OU cashback por real ou dólar gasto em parceiro):
+- "titulo": template exato: "[X] pontos por [real/dólar] entre [Parceiro] e [Programa]" para pontos, ou "[X]% de cashback em [Parceiro]" para cashback. Use "Até" só se houver variação.
+- Se a imagem contiver MÚLTIPLAS ofertas em lista, extraia a de MAIOR percentual/destaque como oferta principal e liste as demais no "resumo".
 - "importante": "Sempre verifique a necessidade de uso de cupom, formas de pagamento e produtos específicos participantes, além do prazo para receber os pontos. Recomendamos fortemente que todo processo seja gravado para possível reclamação futura. Sem a gravação você não obterá os pontos se eles não forem creditados corretamente."
 - "loja": nome do parceiro/ecommerce
 - "cupom": código principal se houver, senão vazio
@@ -1438,15 +1439,13 @@ function montarMensagemRadar(o) {
     }
   }
 
-  // Loja / Cupom / Importante
+  // Loja / Cupom / Prazo / Importante
   if (o.loja) msg += '🛒 *LOJA* ' + o.loja + '\n\n';
   if (o.cupom) msg += '🏷️ *CUPOM* ' + o.cupom + '\n\n';
-  if (o.importante) msg += '⚠️ *IMPORTANTE* ' + stripEmojis(o.importante) + '\n\n';
-
-  // Prazo e Link com emojis padrão
   if (o.prazo && o.prazo.toLowerCase() !== 'não informado' && o.prazo !== '') {
     msg += '📆 *PRAZO* ' + o.prazo + '\n\n';
   }
+  if (o.importante) msg += '⚠️ *IMPORTANTE* ' + stripEmojis(o.importante) + '\n\n';
   msg += '🔗 *LINK* ' + (o.link || '—') + '\n\n';
   msg += RODAPE_OFERTA;
   return msg;
