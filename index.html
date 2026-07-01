@@ -635,7 +635,17 @@ async function analisarOferta() {
         if(/passageirodeprimeira\.com/i.test(href)) return;
         if(/facebook|instagram|whatsapp|twitter|youtube|tiktok/i.test(href)) return;
         // Remove UTMs
-        try{ var u=new URL(href); ['utm_source','utm_medium','utm_campaign','utm_content','utm_term','utm_id'].forEach(function(k){u.searchParams.delete(k);}); href=u.toString(); }catch(e){}
+        try{
+          var u=new URL(href);
+          // Remove parâmetros utm_ pelo nome
+          ['utm_source','utm_medium','utm_campaign','utm_content','utm_term','utm_id'].forEach(function(k){u.searchParams.delete(k);});
+          // Remove parâmetros cujo valor contenha referência ao PP ou UTMs embutidos
+          Array.from(u.searchParams.keys()).forEach(function(k){
+            var v = u.searchParams.get(k)||'';
+            if(/passageiro/i.test(v)||/\?utm_/i.test(v)||/utm_source/i.test(v)){u.searchParams.delete(k);}
+          });
+          href=u.toString();
+        }catch(e){}
         if(vistos.has(href)) return; vistos.add(href);
         var texto = a.replace(/<[^>]+>/g,'').trim();
         hrefs.push('"'+texto+'" → '+href);
@@ -1724,6 +1734,25 @@ function verificarServidor(){
     .catch(function(){wsConectado=false;document.getElementById('ws-dot').className='ws-dot off';document.getElementById('ws-label').textContent='Servidor desconectado.';});
 }
 
+// Verifica silenciosamente o número de ofertas pendentes para atualizar o badge
+// sem precisar que o usuário esteja na aba "Aprovar Ofertas"
+function verificarOfertasPendentes(){
+  fetch(OFERTAS_PENDENTES_URL+'?t='+Date.now(),{cache:'no-cache',signal:AbortSignal.timeout(5000)})
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(data){
+      if (!data) return;
+      var total = (data.items || []).length;
+      var badge = document.getElementById('ofertas-badge');
+      if (total > 0) { badge.textContent = total; badge.style.display='inline-block'; }
+      else badge.style.display='none';
+      // Atualiza o array local só se a aba não estiver aberta (para não interferir com edições em andamento)
+      if (!document.getElementById('panel-ofertas').classList.contains('active')) {
+        ofertasPendentesData = data.items || [];
+      }
+    })
+    .catch(function(){}); // silencioso — falhas de rede não afetam a UI
+}
+
 async function enviarWA(msgId,statusId,fileKey) {
   var editEl=document.getElementById(msgId+'-edit');
   var texto=editEl?editEl.value:'';
@@ -1846,6 +1875,8 @@ window.addEventListener('DOMContentLoaded', function() {
 
   verificarServidor();
   setInterval(verificarServidor, 5000);
+  verificarOfertasPendentes();
+  setInterval(verificarOfertasPendentes, 60000); // verifica a cada 60s (GitHub Pages tem cache)
 });
 </script>
 
