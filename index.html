@@ -577,7 +577,7 @@ async function chamarIA(messages, useSearch) {
   }
   text = text.replace(/```json\s*/gi,'').replace(/```\s*/gi,'').trim();
   console.log('[IA raw] tamanho='+text.length+' inicio='+text.substring(0,100));
-  var match = text.match(/\[[\s\S]*\]/) || text.match(/\{[\s\S]*\}/);
+  var match = text.match(/\{[\s\S]*\}/) || text.match(/\[[\s\S]*\]/);
   if (!match) throw new Error('JSON não encontrado: '+text.substring(0,200));
   var parsed = JSON.parse(match[0]);
   console.log('[IA parsed]', JSON.stringify(parsed).substring(0,300));
