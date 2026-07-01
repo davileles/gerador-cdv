@@ -510,10 +510,14 @@ REGRAS GERAIS:
 
 COMPRA BONIFICADA (oferta onde se ganha pontos/milhas OU cashback por real ou dólar gasto em parceiro):
 - "titulo": template exato: "[X] pontos por [real/dólar] entre [Parceiro] e [Programa]" para pontos, ou "[X]% de cashback em [Parceiro]" para cashback. Use "Até" só se houver variação.
-- Se o conteúdo contiver MÚLTIPLAS lojas/parceiros com pontuações diferentes (ex: tabela de parceiros), use o parceiro de MAIOR pontuação no título. No campo "loja", liste TODOS os parceiros separados por vírgula. No campo "restricoes", liste CADA parceiro com sua pontuação individual no formato "NomeLoja: X pts/R$" — um item por parceiro, ordenado do maior para o menor. Inclua prazo específico de cada parceiro ao lado se houver (ex: "NomeLoja: X pts/R$ (até DD/MM)").
-- Se for oferta de parceiro único, use normalmente título com o nome da loja.
+- PARCEIRO ÚNICO: preencha normalmente com o nome da loja no título e em "loja".
+- MÚLTIPLOS PARCEIROS (tabela ou lista de lojas com pontuações diferentes):
+  • "titulo": use o parceiro de MAIOR pontuação
+  • "resumo": 2 a 3 frases descrevendo a oportunidade geral
+  • "descricao": liste CADA parceiro em linha separada, formato exato: "🛍️ NomeLoja — X pts/R$ (até DD/MM)" ou "🛍️ NomeLoja — X pts/R$" se sem prazo específico. Ordene do maior para o menor. Uma linha por parceiro.
+  • "loja": nome do PROGRAMA DE FIDELIDADE (ex: Esfera, Livelo, Smiles) — NÃO o nome da loja
+  • "restricoes": apenas restrições GERAIS da campanha (prazo geral, cupom, condições de pagamento). NÃO repita a lista de parceiros aqui.
 - "importante": "Sempre verifique a necessidade de uso de cupom, formas de pagamento e produtos específicos participantes, além do prazo para receber os pontos. Recomendamos fortemente que todo processo seja gravado para possível reclamação futura. Sem a gravação você não obterá os pontos se eles não forem creditados corretamente."
-- "loja": nome do parceiro principal (maior pontuação) ou lista de parceiros separados por vírgula se múltiplos
 - "cupom": código principal se houver, senão vazio
 
 COMPRA DE PONTOS ou TRANSFERÊNCIA COM BÔNUS:
@@ -710,8 +714,14 @@ async function analisarOferta() {
     obj.importante=normalizarParceiros(obj.importante); obj.link=normalizarParceiros(obj.link);
     ['o-titulo','o-corpo','o-prazo','o-loja','o-cupom','o-importante','o-link','o-programa','o-bonus','o-milheiro','o-teto','o-restricoes','o-categoria'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=id==='o-categoria'?'geral':''; });
     if (obj.titulo)     document.getElementById('o-titulo').value=obj.titulo;
-    if (obj.resumo)     document.getElementById('o-corpo').value=obj.resumo;
-    else if (obj.descricao) document.getElementById('o-corpo').value=obj.descricao;
+    // Se houver resumo E descricao (caso de múltiplos parceiros), concatena os dois
+    if (obj.resumo && obj.descricao) {
+      document.getElementById('o-corpo').value = obj.resumo + '\n\n' + obj.descricao;
+    } else if (obj.resumo) {
+      document.getElementById('o-corpo').value = obj.resumo;
+    } else if (obj.descricao) {
+      document.getElementById('o-corpo').value = obj.descricao;
+    }
     if (obj.loja)       document.getElementById('o-loja').value=obj.loja;
     if (obj.cupom)      document.getElementById('o-cupom').value=obj.cupom;
     if (obj.importante) document.getElementById('o-importante').value=obj.importante;
