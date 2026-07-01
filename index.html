@@ -597,21 +597,49 @@ async function analisarOferta() {
     btn.textContent='⏳ Buscando...'; btn.disabled=true;
     okEl.style.color='var(--muted)'; okEl.textContent='Buscando conteúdo da página...';
     var html = '';
-    var proxies = ['https://api.allorigins.win/get?url=','https://api.codetabs.com/v1/proxy?quest=','https://corsproxy.io/?'];
-    for (var pi=0; pi<proxies.length; pi++) {
-      try {
-        var pr = await fetch(proxies[pi]+encodeURIComponent(url), {signal:AbortSignal.timeout(8000)});
-        var pd = await pr.json().catch(async function(){ return {contents: await pr.text()}; });
-        var c = pd.contents || pd || '';
-        if (typeof c !== 'string') c = JSON.stringify(c);
-        if (c.length > 500) { html=c; break; }
-      } catch(ep) { console.log('proxy '+pi+' falhou:', ep.message); }
+
+    // 1. Tenta o proxy CDV (Railway) — mesmo que o coletar-radar.js usa
+    try {
+      var cdvRes = await fetch(CDV_PROXY+'/fetch?url='+encodeURIComponent(url), {signal:AbortSignal.timeout(20000)});
+      if (cdvRes.ok) {
+        var cdvText = await cdvRes.text();
+        if (cdvText.length > 500 && !cdvText.startsWith('{"error"')) html = cdvText;
+      }
+    } catch(ep) { console.log('[CDV proxy] falhou:', ep.message); }
+
+    // 2. Fallback: proxies públicos
+    if (!html) {
+      var proxies = ['https://api.allorigins.win/get?url=','https://api.codetabs.com/v1/proxy?quest=','https://corsproxy.io/?'];
+      for (var pi=0; pi<proxies.length; pi++) {
+        try {
+          var pr = await fetch(proxies[pi]+encodeURIComponent(url), {signal:AbortSignal.timeout(8000)});
+          var pd = await pr.json().catch(async function(){ return {contents: await pr.text()}; });
+          var c = pd.contents || pd || '';
+          if (typeof c !== 'string') c = JSON.stringify(c);
+          if (c.length > 500) { html=c; break; }
+        } catch(ep) { console.log('proxy '+pi+' falhou:', ep.message); }
+      }
     }
     if (html) {
-      var hrefMatches = html.match(/href=["']([^"'#][^"']*?)["'][^>]*>[^<]*(?:clique|acesse|confira|participe|saiba mais|garanta|aproveite|resgate|cadastre|aqui|here|oferta|banco|promo|bonus|bônus|compra|transfer|participar|acessar)[^<]*/gi)||[];
-      var hrefs = hrefMatches.map(function(m){var hm=m.match(/href=["']([^"']+)["']/i);var tm=m.match(/>([^<]{3,60})/);return hm?'"'+(tm?tm[1].trim():'')+'" → '+hm[1]:null;}).filter(Boolean);
-      pageText = html.replace(/<script[\s\S]*?<\/script>/gi,'').replace(/<style[\s\S]*?<\/style>/gi,'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().substring(0,6000);
-      if (hrefs.length) pageText += '\n\nLINKS COM ÂNCORAS RELEVANTES:\n'+hrefs.join('\n');
+      // Extrai links CTA (clique aqui, acesse, confira...) excluindo o próprio site
+      var hrefMatches = html.match(/<a\s[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)||[];
+      var hrefs = [];
+      var vistos = new Set();
+      var ctaRe = /clique aqui|acesse|confira|participe|saiba mais|garanta|aproveite|resgate|cadastre|aqui|here|oferta|banco|promo|bonus|bônus|compra|transfer|participar|acessar/i;
+      hrefMatches.forEach(function(a){
+        var hm = a.match(/href="([^"]+)"/i); if(!hm) return;
+        var href = hm[1].replace(/&amp;/g,'&');
+        if(!/^https?:\/\//i.test(href)) return;
+        if(/passageirodeprimeira\.com/i.test(href)) return;
+        if(/facebook|instagram|whatsapp|twitter|youtube|tiktok/i.test(href)) return;
+        // Remove UTMs
+        try{ var u=new URL(href); ['utm_source','utm_medium','utm_campaign','utm_content','utm_term','utm_id'].forEach(function(k){u.searchParams.delete(k);}); href=u.toString(); }catch(e){}
+        if(vistos.has(href)) return; vistos.add(href);
+        var texto = a.replace(/<[^>]+>/g,'').trim();
+        hrefs.push('"'+texto+'" → '+href);
+      });
+      pageText = html.replace(/<script[\s\S]*?<\/script>/gi,'').replace(/<style[\s\S]*?<\/style>/gi,'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().substring(0,10000);
+      if (hrefs.length) pageText += '\n\nLINKS EXTERNOS ENCONTRADOS NA PÁGINA:\n'+hrefs.slice(0,15).join('\n');
     } else { pageText = '(nenhum proxy conseguiu buscar a página)'; }
     messages = [{role:'user',content:'URL enviada (NÃO use como link da oferta): '+url+'\n\nCONTEÚDO DA PÁGINA:\n'+pageText+'\n\n'+PROMPT}];
   } else if (currentMode==='texto') {
