@@ -599,9 +599,9 @@ async function analisarOferta() {
     okEl.style.color='var(--muted)'; okEl.textContent='Buscando conteúdo da página...';
     var html = '';
 
-    // 1. Tenta o proxy CDV (Railway) — mesmo que o coletar-radar.js usa
+    // 1. Tenta o proxy CDV — endpoint /fetch-oferta (sem restrição de domínio)
     try {
-      var cdvRes = await fetch(CDV_PROXY+'/fetch?url='+encodeURIComponent(url), {signal:AbortSignal.timeout(20000)});
+      var cdvRes = await fetch(CDV_PROXY+'/fetch-oferta?url='+encodeURIComponent(url), {signal:AbortSignal.timeout(20000)});
       if (cdvRes.ok) {
         var cdvText = await cdvRes.text();
         if (cdvText.length > 500 && !cdvText.startsWith('{"error"')) html = cdvText;
@@ -641,8 +641,12 @@ async function analisarOferta() {
       });
       pageText = html.replace(/<script[\s\S]*?<\/script>/gi,'').replace(/<style[\s\S]*?<\/style>/gi,'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().substring(0,10000);
       if (hrefs.length) pageText += '\n\nLINKS EXTERNOS ENCONTRADOS NA PÁGINA:\n'+hrefs.slice(0,15).join('\n');
-    } else { pageText = '(nenhum proxy conseguiu buscar a página)'; }
-    messages = [{role:'user',content:'URL enviada (NÃO use como link da oferta): '+url+'\n\nCONTEÚDO DA PÁGINA:\n'+pageText+'\n\n'+PROMPT}];
+      messages = [{role:'user',content:'URL enviada (NÃO use como link da oferta): '+url+'\n\nCONTEÚDO DA PÁGINA:\n'+pageText+'\n\n'+PROMPT}];
+    } else {
+      // Nenhum proxy funcionou — pede ao Claude para pesquisar na web
+      okEl.textContent='Página protegida — buscando via pesquisa web...';
+      messages = [{role:'user',content:'Não foi possível buscar o conteúdo desta URL diretamente pois a página tem proteção contra acesso automatizado: '+url+'\n\nUse a ferramenta de pesquisa web para encontrar informações sobre esta oferta (busque pelo título ou conteúdo da URL) e extraia todos os dados solicitados.\n\n'+PROMPT}];
+    }
   } else if (currentMode==='texto') {
     var txt = document.getElementById('texto-input').value.trim();
     if (!txt) { okEl.style.color='#ff585e'; okEl.textContent='Cole um texto antes.'; return; }
