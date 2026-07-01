@@ -227,6 +227,28 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator{filter:invert(.5
         <input type="text" id="o-importante" placeholder="Ex: Apenas cartão de crédito"/>
       </div>
     </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field">
+        <label>Programa <span class="tag">opcional</span></label>
+        <input type="text" id="o-programa" placeholder="Ex: LATAM Pass, Livelo"/>
+      </div>
+      <div class="field">
+        <label>Bônus / Ganho <span class="tag">opcional</span></label>
+        <input type="text" id="o-bonus" placeholder="Ex: 25% de bônus"/>
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:12px">
+      <label>Custo do milheiro <span class="tag">opcional</span></label>
+      <textarea id="o-milheiro" placeholder="Ex: Custo do milheiro: R$ 23,50 por 1.000 pontos" style="min-height:48px"></textarea>
+    </div>
+    <div class="field" style="margin-bottom:12px">
+      <label>Teto de bônus <span class="tag">opcional</span></label>
+      <textarea id="o-teto" placeholder="Ex: Bônus de 25%: até 400.000 pontos&#10;Bônus de 50%: até 200.000 pontos" style="min-height:60px"></textarea>
+    </div>
+    <div class="field" style="margin-bottom:12px">
+      <label>Restrições / Condições <span class="tag">opcional — uma por linha</span></label>
+      <textarea id="o-restricoes" placeholder="Ex: Válida apenas hoje&#10;Mínimo de 12.000 pontos Livelo&#10;Limite de 100.000 milhas por CPF" style="min-height:90px"></textarea>
+    </div>
     <div class="field">
       <label>Link da oferta</label>
       <input type="text" id="o-link" placeholder="https://..."/>
@@ -481,49 +503,32 @@ function buildPromptOferta() {
 
 REGRAS GERAIS:
 1. Extraia informações ESTRITAMENTE do conteúdo enviado. Não invente nada.
-2. Extraia sempre que existirem: cupons, descontos, valores, condições e validade/prazo.
-3. Se houver mais de um cupom, liste TODOS na descrição com suas regras.
-4. Se descontos variam, escreva "Desconto varia conforme destino/período:" e liste exemplos.
+2. Se alguma informação não estiver clara, use string vazia — nunca invente dados.
+3. NUNCA mencione ou cite a fonte/blog de onde veio a informação.
+4. Retorne SOMENTE JSON válido, sem markdown, sem texto antes ou depois.
 
 COMPRA BONIFICADA (oferta onde se ganha pontos/milhas por real ou dólar gasto em parceiro):
-- TÍTULO: template exato: "[X] pontos por [real/dólar] entre [Parceiro] e [Programa]". Use "Até" só se houver variação de pontuação por perfil/categoria.
-- DESCRIÇÃO: extraia FIELMENTE o que está na página. Liste quebras de pontuação por perfil, categoria, condição, cupom e prazo específico de cada condição. Use bullets com hífen.
-- PRAZO: use o prazo de ENCERRAMENTO da campanha (quando a oferta para de valer). NUNCA use prazo de check-out/check-in — esses ficam na descrição. Se não houver prazo de encerramento explícito, deixe vazio.
-- IMPORTANTE: "Sempre verifique a necessidade de uso de cupom, formas de pagamento e produtos específicos participantes, além do prazo para receber os pontos. Recomendamos fortemente que todo processo seja gravado para possível reclamação futura. Sem a gravação você não obterá os pontos se eles não forem creditados corretamente."
-- LOJA: nome do parceiro/ecommerce
-- CUPOM: código principal se houver, senão vazio
+- "titulo": template exato: "[X] pontos por [real/dólar] entre [Parceiro] e [Programa]". Use "Até" só se houver variação.
+- "importante": "Sempre verifique a necessidade de uso de cupom, formas de pagamento e produtos específicos participantes, além do prazo para receber os pontos. Recomendamos fortemente que todo processo seja gravado para possível reclamação futura. Sem a gravação você não obterá os pontos se eles não forem creditados corretamente."
+- "loja": nome do parceiro/ecommerce
+- "cupom": código principal se houver, senão vazio
 
 COMPRA DE PONTOS ou TRANSFERÊNCIA COM BÔNUS:
-- Sempre calcule e informe o custo do milheiro (custo de 1.000 pontos) na descrição.
-- Fórmula: CUSTO_MILHEIRO = (VALOR_TOTAL / PONTOS_RECEBIDOS) * 1000
-- Arredonde para 2 casas decimais.
-- Exemplo: R$ 885,60 para receber 32.000 pontos → (885,60 / 32.000) * 1000 = R$ 27,65 por mil pontos.
-- Formato na descrição: "💰 Custo do milheiro: R$ XX,XX por 1.000 pontos"
-- Se houver variação por perfil/quantidade, calcule o custo do milheiro para cada cenário.
+- "milheiro": calcule o custo de 1.000 pontos quando houver valor pago e pontos recebidos.
+  Fórmula: (VALOR_TOTAL / PONTOS_RECEBIDOS) * 1000. Arredonde para 2 casas decimais.
+  Formato: "Custo do milheiro: R$ XX,XX por 1.000 pontos". Se houver múltiplos cenários, um por linha.
+- "tetoTransferencia": quando houver limite máximo de bônus por CPF, calcule o volume máximo a transferir para atingir esse teto para CADA perfil/percentual.
+  Fórmula: PONTOS_PARA_TETO = TETO / (PERCENTUAL / 100).
+  Formato: "Bônus de X% (perfil): até Y pontos". Um cenário por linha.
+  Exemplo: teto de 300.000 milhas com 80% → "Bônus de 80%: até 375.000 pontos". Se não houver teto, deixe vazio.
 
-LINK: Use SEMPRE o link oficial da oferta. Procure no conteúdo hrefs próximos a "clique aqui", "acesse", "confira", "participar" etc. Extraia o href de destino do hyperlink. Remova parâmetros UTM. Se o conteúdo vier de um PDF (onde hyperlinks perdem o href) ou não tiver link explícito, use o link oficial do programa/parceiro com base no contexto:
-- Clube Livelo / assinatura Livelo → https://www.livelo.com.br/clube
-- Livelo (compra de pontos) → https://www.livelo.com.br/compre-pontos
-- Livelo (geral/compra bonificada) → https://www.livelo.com.br
-- Clube Smiles / assinatura Smiles → https://www.smiles.com.br/clube-smiles/beneficios-clube
-- Smiles (geral) → https://www.smiles.com.br/home
-- Clube LATAM Pass / assinatura LATAM → https://latampass.latam.com/pt_br/clube
-- LATAM Pass (geral) → https://www.latamairlines.com/br/pt
-- Clube Azul / assinatura Azul Fidelidade → https://www.voeazul.com.br/br/pt/programa-fidelidade/clube-azul
-- Azul Fidelidade (geral) → https://www.voeazul.com.br/br/pt/home
-- Azul pelo Mundo → https://azulpelomundo.voeazul.com.br
-- Clube Esfera / assinatura Esfera → https://www.esfera.com.vc/clube
-- Esfera (geral) → https://www.esfera.com.vc
-- Hoteis.com → https://www.hoteis.com
-- Magalu → https://www.magazineluiza.com.br
-- Iberia Plus → https://www.iberia.com/
-- SUMA → https://www.aireuropa.com/en/flights/home
-- AAdvantage → https://www.aa.com.br/
-- TAP → https://www.flytap.com/
-NUNCA use o link do blog ou artigo como link da oferta.
+PRAZO: use o prazo de ENCERRAMENTO da campanha. NUNCA use prazo de check-in/check-out — esse vai em "restricoes". Se não houver prazo explícito, deixe vazio.
 
-Responda SOMENTE com JSON válido sem markdown:
-{"titulo":"","descricao":"","prazo":"DD/MM ou vazio","loja":"","cupom":"","link":"","importante":""}`;
+LINK: use sempre o link oficial da oferta (sem parâmetros UTM). Procure hrefs próximos a "clique aqui", "acesse", "confira", "participar". NUNCA use link do blog/artigo.
+Fallbacks por programa: Livelo→https://www.livelo.com.br, Smiles→https://www.smiles.com.br/home, LATAM Pass→https://www.latamairlines.com/br/pt, Azul Fidelidade→https://www.voeazul.com.br/br/pt/home, Esfera→https://www.esfera.com.vc, Iberia→https://www.iberia.com, TAP→https://www.flytap.com, AAdvantage→https://www.aa.com.br.
+
+Responda SOMENTE com este JSON (todos os campos sempre presentes, mesmo que vazios):
+{"titulo":"","resumo":"2 a 3 frases resumindo a oportunidade","programa":"nome do(s) programa(s)","bonus":"valor do bônus de forma objetiva","descricao":"","prazo":"DD/MM ou vazio","loja":"","cupom":"","link":"","importante":"","milheiro":"","tetoTransferencia":"","restricoes":["condição 1","condição 2"]}`;
 }
 
 // ══ PROMPT MILHAS ══
@@ -633,13 +638,21 @@ async function analisarOferta() {
     obj.titulo=normalizarParceiros(obj.titulo); obj.descricao=normalizarParceiros(obj.descricao);
     obj.loja=normalizarParceiros(obj.loja); obj.cupom=normalizarParceiros(obj.cupom);
     obj.importante=normalizarParceiros(obj.importante); obj.link=normalizarParceiros(obj.link);
-    ['o-titulo','o-corpo','o-prazo','o-loja','o-cupom','o-importante','o-link'].forEach(function(id){ document.getElementById(id).value=''; });
+    ['o-titulo','o-corpo','o-prazo','o-loja','o-cupom','o-importante','o-link','o-programa','o-bonus','o-milheiro','o-teto','o-restricoes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
     if (obj.titulo)     document.getElementById('o-titulo').value=obj.titulo;
-    if (obj.descricao)  document.getElementById('o-corpo').value=obj.descricao;
+    if (obj.resumo)     document.getElementById('o-corpo').value=obj.resumo;
+    else if (obj.descricao) document.getElementById('o-corpo').value=obj.descricao;
     if (obj.loja)       document.getElementById('o-loja').value=obj.loja;
     if (obj.cupom)      document.getElementById('o-cupom').value=obj.cupom;
     if (obj.importante) document.getElementById('o-importante').value=obj.importante;
     if (obj.link)       document.getElementById('o-link').value=obj.link;
+    if (obj.programa)   document.getElementById('o-programa').value=obj.programa;
+    if (obj.bonus)      document.getElementById('o-bonus').value=obj.bonus;
+    if (obj.milheiro)   document.getElementById('o-milheiro').value=obj.milheiro;
+    if (obj.tetoTransferencia) document.getElementById('o-teto').value=obj.tetoTransferencia;
+    if (obj.restricoes && Array.isArray(obj.restricoes) && obj.restricoes.length) {
+      document.getElementById('o-restricoes').value=obj.restricoes.join('\n');
+    }
     if (!obj.link && currentMode==='link') document.getElementById('o-link').value=document.getElementById('url-input').value.trim();
     if (obj.prazo && obj.prazo.includes('/')) {
       var pp=obj.prazo.split('/');
@@ -722,25 +735,59 @@ async function analisarMilhas() {
 
 // ══ GERAR OFERTA ══
 function gerarOferta() {
-  var titulo=document.getElementById('o-titulo').value.trim();
-  var corpo=document.getElementById('o-corpo').value.trim();
-  var prazoRaw=document.getElementById('o-prazo').value;
-  var loja=document.getElementById('o-loja').value.trim();
-  var cupom=document.getElementById('o-cupom').value.trim();
-  var importante=document.getElementById('o-importante').value.trim();
-  var link=document.getElementById('o-link').value.trim();
+  var titulo    = document.getElementById('o-titulo').value.trim();
+  var corpo     = document.getElementById('o-corpo').value.trim();
+  var prazoRaw  = document.getElementById('o-prazo').value;
+  var loja      = document.getElementById('o-loja').value.trim();
+  var cupom     = document.getElementById('o-cupom').value.trim();
+  var importante= document.getElementById('o-importante').value.trim();
+  var link      = document.getElementById('o-link').value.trim();
+  var programa  = document.getElementById('o-programa') ? document.getElementById('o-programa').value.trim() : '';
+  var bonus     = document.getElementById('o-bonus') ? document.getElementById('o-bonus').value.trim() : '';
+  var milheiro  = document.getElementById('o-milheiro') ? document.getElementById('o-milheiro').value.trim() : '';
+  var teto      = document.getElementById('o-teto') ? document.getElementById('o-teto').value.trim() : '';
+  var restricoesTxt = document.getElementById('o-restricoes') ? document.getElementById('o-restricoes').value.trim() : '';
+  var restricoes = restricoesTxt ? restricoesTxt.split('\n').map(function(s){return s.trim();}).filter(Boolean) : [];
+
   if (!titulo&&!corpo){alert('Preencha pelo menos o título ou a descrição.');return;}
-  var msg='';
-  if (titulo) msg+='*'+titulo+'*\n\n';
-  if (corpo)  msg+=corpo+'\n\n';
+
+  // Converte prazoRaw (YYYY-MM-DD) para DD/MM/YYYY
   var prazoFmt='';
-  if (prazoRaw){var pp=prazoRaw.split('-');if(pp.length===3)prazoFmt=pp[2]+'/'+pp[1];}
-  if (prazoFmt&&prazoRaw!==hoje()) msg+='📆 *PRAZO* '+prazoFmt+'\n\n';
-  if (loja&&loja!==LOJA_TODAS) msg+='🛒 *LOJA* '+loja+'\n\n';
-  if (cupom)      msg+='🏷️ *CUPOM* '+cupom+'\n\n';
-  if (importante) msg+='⚠️ *IMPORTANTE* '+importante+'\n\n';
-  msg+='🔗 *LINK* '+(link||'—')+'\n\n';
-  msg+=RODAPE_OFERTA;
+  if (prazoRaw){var pp=prazoRaw.split('-');if(pp.length===3)prazoFmt=pp[2]+'/'+pp[1]+'/'+pp[0];}
+
+  // Usa montarMensagemRadar se houver campos estruturados, senão formato simples
+  var temEstrutura = teto || restricoes.length || milheiro || programa;
+  var msg = '';
+  if (temEstrutura) {
+    var obj = {
+      titulo: titulo,
+      resumo: corpo,
+      programa: programa,
+      bonus: bonus,
+      prazo: prazoFmt || (prazoRaw !== hoje() ? '' : ''),
+      loja: loja !== LOJA_TODAS ? loja : '',
+      cupom: cupom,
+      importante: importante,
+      milheiro: milheiro,
+      tetoTransferencia: teto,
+      restricoes: restricoes,
+      link: link
+    };
+    // Calcula prazo no formato que montarMensagemRadar espera
+    if (prazoRaw && prazoRaw !== hoje()) obj.prazo = prazoFmt;
+    msg = montarMensagemRadar(obj);
+  } else {
+    // Formato legado para quem preenche manualmente sem campos estruturados
+    if (titulo) msg += '*'+titulo+'*\n\n';
+    if (corpo)  msg += corpo+'\n\n';
+    if (prazoFmt && prazoRaw !== hoje()) msg += '📆 *PRAZO* '+prazoFmt+'\n\n';
+    if (loja && loja !== LOJA_TODAS) msg += '🛒 *LOJA* '+loja+'\n\n';
+    if (cupom)       msg += '🏷️ *CUPOM* '+cupom+'\n\n';
+    if (importante)  msg += '⚠️ *IMPORTANTE* '+importante+'\n\n';
+    msg += '🔗 *LINK* '+(link||'—')+'\n\n';
+    msg += RODAPE_OFERTA;
+  }
+
   mostrar('o-msg','o-result','o-ok',msg);
 }
 
