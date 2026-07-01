@@ -523,7 +523,7 @@ COMPRA DE PONTOS ou TRANSFERÊNCIA COM BÔNUS:
   Formato: "Bônus de X% (perfil): até Y pontos". Um cenário por linha.
   Exemplo: teto de 300.000 milhas com 80% → "Bônus de 80%: até 375.000 pontos". Se não houver teto, deixe vazio.
 
-PRAZO: use o prazo de ENCERRAMENTO da campanha. Procure ativamente por: "válido até", "até o dia", "encerra em", "vigência", "fim da campanha", datas no formato DD/MM/AAAA ou DD/MM, campos JSON como "dataFim", "endDate", "vigencia", "expiracao". NUNCA use prazo de check-in/check-out — esses ficam em "restricoes". Se não houver prazo explícito de encerramento da campanha, deixe vazio.
+PRAZO: use o prazo de ENCERRAMENTO da campanha. Procure ativamente por: "válido até", "até o dia", "encerra em", "vigência", "fim da campanha", datas no formato DD/MM/AAAA ou DD/MM, campos JSON como "dataFim", "endDate", "vigencia", "expiracao". Quando houver um PERÍODO (ex: "1 a 5 de julho", "de 01/07 a 05/07"), use o ÚLTIMO DIA como prazo (ex: 05/07/2026). NUNCA use prazo de check-in/check-out de hotel ou data de entrega — esses ficam em "restricoes". Se não houver prazo explícito de encerramento da campanha, deixe vazio.
 
 LINK: use sempre o link oficial da oferta (sem parâmetros UTM). Procure hrefs próximos a "clique aqui", "acesse", "confira", "participar". NUNCA use link do blog/artigo.
 Fallbacks por programa: Livelo→https://www.livelo.com.br, Smiles→https://www.smiles.com.br/home, LATAM Pass→https://www.latamairlines.com/br/pt, Azul Fidelidade→https://www.voeazul.com.br/br/pt/home, Esfera→https://www.esfera.com.vc, Iberia→https://www.iberia.com, TAP→https://www.flytap.com, AAdvantage→https://www.aa.com.br.
@@ -660,7 +660,13 @@ async function analisarOferta() {
       pageText = html.replace(/<script[\s\S]*?<\/script>/gi,'').replace(/<style[\s\S]*?<\/style>/gi,'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().substring(0,10000);
       if (scriptJsonExtra) pageText += '\n\nDADOS EMBUTIDOS NA PÁGINA (podem conter datas de campanha):\n'+scriptJsonExtra.substring(0,2000);
       if (hrefs.length) pageText += '\n\nLINKS EXTERNOS ENCONTRADOS NA PÁGINA:\n'+hrefs.slice(0,15).join('\n');
-      messages = [{role:'user',content:'URL enviada (NÃO use como link da oferta): '+url+'\n\nCONTEÚDO DA PÁGINA:\n'+pageText+'\n\n'+PROMPT}];
+      // Detecta se a URL enviada é de um site parceiro/programa oficial (não blog)
+      var DOMINIOS_PARCEIROS = /esfera\.com\.vc|smiles\.com\.br|livelo\.com\.br|voeazul\.com\.br|azulpelomundo|latamairlines\.com|latampass\.latam|iberia\.com|flytap\.com|aa\.com\.br|aireuropa\.com|hoteis\.com|magazineluiza\.com\.br|accor\.com|marriott\.com|ihg\.com|hilton\.com|accorhotels\.com|all\.accor\.com/;
+      var ehParceiro = DOMINIOS_PARCEIROS.test(url);
+      var instrucaoUrl = ehParceiro
+        ? 'URL da oferta (esta URL É o link correto da oferta, use-a como "link" no JSON): '+url
+        : 'URL do artigo de origem (NÃO use como link da oferta — use o link oficial do programa/parceiro): '+url;
+      messages = [{role:'user',content:instrucaoUrl+'\n\nCONTEÚDO DA PÁGINA:\n'+pageText+'\n\n'+PROMPT}];
     } else {
       // Nenhum proxy funcionou — pede ao Claude para pesquisar na web
       okEl.textContent='Página protegida — buscando via pesquisa web...';
