@@ -1161,6 +1161,7 @@ function ofCatOptions(sel) {
 function renderOfertaPendenteCard(o) {
   var data = o.publicadoEm ? new Date(o.publicadoEm).toLocaleString('pt-BR') : '';
   var restricoesTxt = (o.restricoes||[]).join('\n');
+  var msgPrevia = escapeHtml(montarMensagemRadar(o));
   return '<div class="alerta-card" id="oferta-card-'+o.id+'">'
     +'<div class="alerta-header">'
     +'<span class="alerta-id">'+(o.emoji||'📰')+'</span>'
@@ -1169,26 +1170,34 @@ function renderOfertaPendenteCard(o) {
     +'</div>'
     +'<div style="padding:14px;display:flex;flex-direction:column;gap:10px">'
       +'<div class="g2">'
-        +'<div class="field"><label>Título</label><input id="of-titulo-'+o.id+'" value="'+escapeAttr(o.titulo)+'"/></div>'
-        +'<div class="field"><label>Categoria</label><select id="of-categoria-'+o.id+'">'+ofCatOptions(o.categoria)+'</select></div>'
+        +'<div class="field"><label>Título</label><input id="of-titulo-'+o.id+'" value="'+escapeAttr(o.titulo)+'" oninput="atualizarPrevia(\''+o.id+'\')"/></div>'
+        +'<div class="field"><label>Categoria</label><select id="of-categoria-'+o.id+'" onchange="atualizarPrevia(\''+o.id+'\')">'+ofCatOptions(o.categoria)+'</select></div>'
       +'</div>'
       +'<div class="g2">'
         +'<div class="field"><label>Programa</label><input id="of-programa-'+o.id+'" value="'+escapeAttr(o.programa)+'"/></div>'
         +'<div class="field"><label>Bônus / Ganho</label><input id="of-bonus-'+o.id+'" value="'+escapeAttr(o.bonus)+'"/></div>'
       +'</div>'
       +'<div class="g2">'
-        +'<div class="field"><label>Prazo</label><input id="of-prazo-'+o.id+'" value="'+escapeAttr(o.prazo)+'" placeholder="ex: 30/06/2026 ou vazio"/></div>'
-        +'<div class="field"><label>Link da oferta</label><input id="of-link-'+o.id+'" value="'+escapeAttr(o.link)+'" placeholder="https://..."/></div>'
+        +'<div class="field"><label>Prazo</label><input id="of-prazo-'+o.id+'" value="'+escapeAttr(o.prazo)+'" placeholder="ex: 30/06/2026 ou vazio" oninput="atualizarPrevia(\''+o.id+'\')"/></div>'
+        +'<div class="field"><label>Link da oferta</label><input id="of-link-'+o.id+'" value="'+escapeAttr(o.link)+'" placeholder="https://..." oninput="atualizarPrevia(\''+o.id+'\')"/></div>'
       +'</div>'
       +'<div class="g2">'
-        +'<div class="field"><label>Loja (compra bonificada)</label><input id="of-loja-'+o.id+'" value="'+escapeAttr(o.loja)+'"/></div>'
-        +'<div class="field"><label>Cupom</label><input id="of-cupom-'+o.id+'" value="'+escapeAttr(o.cupom)+'"/></div>'
+        +'<div class="field"><label>Loja (compra bonificada)</label><input id="of-loja-'+o.id+'" value="'+escapeAttr(o.loja)+'" oninput="atualizarPrevia(\''+o.id+'\')"/></div>'
+        +'<div class="field"><label>Cupom</label><input id="of-cupom-'+o.id+'" value="'+escapeAttr(o.cupom)+'" oninput="atualizarPrevia(\''+o.id+'\')"/></div>'
       +'</div>'
-      +'<div class="field"><label>Resumo</label><textarea id="of-resumo-'+o.id+'" style="min-height:70px">'+escapeHtml(o.resumo)+'</textarea></div>'
-      +'<div class="field"><label>Custo do milheiro</label><textarea id="of-milheiro-'+o.id+'" style="min-height:50px">'+escapeHtml(o.milheiro)+'</textarea></div>'
-      +'<div class="field"><label>Teto de bônus (transferência)</label><textarea id="of-teto-'+o.id+'" style="min-height:50px">'+escapeHtml(o.tetoTransferencia)+'</textarea></div>'
-      +'<div class="field"><label>Restrições / condições (uma por linha)</label><textarea id="of-restricoes-'+o.id+'" style="min-height:110px">'+escapeHtml(restricoesTxt)+'</textarea></div>'
-      +'<div class="field"><label>Texto "Importante" (compra bonificada)</label><textarea id="of-importante-'+o.id+'" style="min-height:60px">'+escapeHtml(o.importante)+'</textarea></div>'
+      +'<div class="field"><label>Resumo</label><textarea id="of-resumo-'+o.id+'" style="min-height:70px" oninput="atualizarPrevia(\''+o.id+'\')">'+escapeHtml(o.resumo)+'</textarea></div>'
+      +'<div class="field"><label>Custo do milheiro</label><textarea id="of-milheiro-'+o.id+'" style="min-height:50px" oninput="atualizarPrevia(\''+o.id+'\')">'+escapeHtml(o.milheiro)+'</textarea></div>'
+      +'<div class="field"><label>Teto de bônus (transferência)</label><textarea id="of-teto-'+o.id+'" style="min-height:50px" oninput="atualizarPrevia(\''+o.id+'\')">'+escapeHtml(o.tetoTransferencia)+'</textarea></div>'
+      +'<div class="field"><label>Restrições / condições (uma por linha)</label><textarea id="of-restricoes-'+o.id+'" style="min-height:110px" oninput="atualizarPrevia(\''+o.id+'\')">'+escapeHtml(restricoesTxt)+'</textarea></div>'
+      +'<div class="field"><label>Texto "Importante" (compra bonificada)</label><textarea id="of-importante-'+o.id+'" style="min-height:60px" oninput="atualizarPrevia(\''+o.id+'\')">'+escapeHtml(o.importante)+'</textarea></div>'
+      // ── Preview da mensagem WhatsApp ──
+      +'<div style="border-top:1px solid var(--border2);margin-top:4px;padding-top:12px">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+          +'<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--accent)">📱 Mensagem para o WhatsApp</label>'
+          +'<button class="btn" style="background:var(--surface2);color:var(--muted);font-size:11px;padding:4px 10px;border:1px solid var(--border2)" onclick="atualizarPrevia(\''+o.id+'\')">↻ Regerar</button>'
+        +'</div>'
+        +'<textarea id="of-msg-'+o.id+'" style="min-height:260px;font-size:12px;line-height:1.6;font-family:monospace;background:#0d0d0d;color:#e5e5e5;border-color:var(--accent);border-radius:8px;padding:12px;width:100%;resize:vertical">'+msgPrevia+'</textarea>'
+      +'</div>'
     +'</div>'
     +'<div class="alerta-footer">'
     +'<button class="btn btn-aprovar" style="flex:1;padding:10px" onclick="aprovarOfertaPendente(\''+o.id+'\')">✓ Aprovar para o Radar</button>'
@@ -1199,6 +1208,13 @@ function renderOfertaPendenteCard(o) {
 }
 
 function escapeAttr(s) { return escapeHtml(s).replace(/"/g, '&quot;'); }
+
+function atualizarPrevia(id) {
+  var el = document.getElementById('of-msg-'+id);
+  if (!el) return;
+  var edits = coletarEdicoesOferta(id);
+  el.value = montarMensagemRadar(edits);
+}
 
 function coletarEdicoesOferta(id) {
   var get = function(field){ var el = document.getElementById('of-'+field+'-'+id); return el ? el.value : ''; };
@@ -1220,30 +1236,94 @@ function coletarEdicoesOferta(id) {
   };
 }
 
+function stripEmojis(str) {
+  if (!str) return '';
+  return str.replace(/[\u{1F000}-\u{1FFFF}]|[\u{2600}-\u{27BF}]|[\u{2300}-\u{23FF}]|[\u{FE00}-\u{FE0F}]|[\u{1F900}-\u{1F9FF}]|\u{20E3}/gu, '').replace(/^\s*[-–]\s*/, '').trim();
+}
+
+function compactarLinhasTeto(str) {
+  if (!str) return [];
+  return str.split('\n').map(function(l) {
+    var limpo = stripEmojis(l.trim()).replace(/^-\s*/, '');
+    // Extrai "Bônus de X% (perfil): até Y pontos" removendo a parte "para atingir..."
+    var m = limpo.match(/^(Bônus de .+?)\s*[:：]\s*transfira\s+até\s+([\d.,]+\s+pontos?).*$/i);
+    if (m) return m[1] + ': até ' + m[2];
+    // Formato já compacto ou outro: retorna limpo
+    return limpo;
+  }).filter(Boolean);
+}
+
+function agruparCondicoes(restricoes) {
+  var volume = [], tempo = [], gerais = [];
+  (restricoes || []).forEach(function(r) {
+    var s = stripEmojis(r).replace(/^-\s*/, '').trim();
+    if (!s) return;
+    if (/^transferências? (de|acima)/i.test(s)) volume.push(s);
+    else if (/^\+\d+%|adicional.*tempo|há mais|entre \d.*ano/i.test(s)) tempo.push(s);
+    else gerais.push(s);
+  });
+  return { volume: volume, tempo: tempo, gerais: gerais };
+}
+
 function montarMensagemRadar(o) {
   var msg = '';
+
+  // Título
   if (o.titulo) msg += '*' + o.titulo + '*\n\n';
 
-  // Corpo: resumo + custo do milheiro + teto de bônus + restrições
-  var corpo = '';
-  if (o.resumo) corpo += o.resumo + '\n\n';
-  if (o.milheiro) corpo += o.milheiro.split('\n').map(function(l){return l.trim();}).filter(Boolean).join('\n') + '\n\n';
-  if (o.tetoTransferencia) corpo += o.tetoTransferencia.split('\n').map(function(l){return l.trim();}).filter(Boolean).join('\n') + '\n\n';
-  if (o.restricoes && o.restricoes.length) corpo += o.restricoes.join('\n') + '\n\n';
-  if (corpo) msg += corpo;
+  // Resumo
+  if (o.resumo) msg += stripEmojis(o.resumo) + '\n\n';
 
-  // Prazo
-  if (o.prazo && o.prazo.toLowerCase() !== 'não informado' && o.prazo !== '') {
-    msg += '📆 *PRAZO* ' + o.prazo + '\n\n';
+  // Custo do milheiro
+  if (o.milheiro) {
+    var lm = o.milheiro.split('\n').map(function(l){ return stripEmojis(l.trim()).replace(/^-\s*/,''); }).filter(Boolean);
+    if (lm.length) {
+      msg += '*Custo do milheiro*\n';
+      lm.forEach(function(l){ msg += '- ' + l + '\n'; });
+      msg += '\n';
+    }
   }
-  // Loja
+
+  // Teto de bônus (linhas compactas)
+  if (o.tetoTransferencia) {
+    var lt = compactarLinhasTeto(o.tetoTransferencia);
+    if (lt.length) {
+      msg += '*Teto de bônus — máximo a transferir por perfil*\n';
+      lt.forEach(function(l){ msg += '- ' + l + '\n'; });
+      msg += '\n';
+    }
+  }
+
+  // Condições agrupadas
+  if (o.restricoes && o.restricoes.length) {
+    var g = agruparCondicoes(o.restricoes);
+    if (g.volume.length) {
+      msg += '*Bônus por volume transferido*\n';
+      g.volume.forEach(function(l){ msg += '- ' + l + '\n'; });
+      msg += '\n';
+    }
+    if (g.tempo.length) {
+      msg += '*Bônus adicional por tempo no Clube*\n';
+      g.tempo.forEach(function(l){ msg += '- ' + l + '\n'; });
+      msg += '\n';
+    }
+    if (g.gerais.length) {
+      msg += '*Condições*\n';
+      g.gerais.forEach(function(l){ msg += '- ' + l + '\n'; });
+      msg += '\n';
+    }
+  }
+
+  // Loja / Cupom / Importante
   if (o.loja) msg += '🛒 *LOJA* ' + o.loja + '\n\n';
-  // Cupom
   if (o.cupom) msg += '🏷️ *CUPOM* ' + o.cupom + '\n\n';
-  // Importante
-  if (o.importante) msg += '⚠️ *IMPORTANTE* ' + o.importante + '\n\n';
-  // Link
-  msg += '🔗 *LINK* ' + (o.link || '—') + '\n\n';
+  if (o.importante) msg += '⚠️ *IMPORTANTE* ' + stripEmojis(o.importante) + '\n\n';
+
+  // Prazo e Link no formato limpo (bold simples, sem emoji)
+  if (o.prazo && o.prazo.toLowerCase() !== 'não informado' && o.prazo !== '') {
+    msg += '*Prazo:* ' + o.prazo + '\n\n';
+  }
+  msg += '*Link:* ' + (o.link || '—') + '\n\n';
   msg += RODAPE_OFERTA;
   return msg;
 }
@@ -1269,8 +1349,9 @@ async function aprovarOfertaPendente(id) {
       ofertasPendentesData = ofertasPendentesData.filter(function(o){return o.id!==id;});
       atualizarBadgeOfertas();
 
-      // Monta e envia a mensagem para o grupo de ofertas do WhatsApp
-      var mensagem = montarMensagemRadar(ofertaEditada);
+      // Usa o conteúdo do textarea de preview (permite edição manual antes de aprovar)
+      var msgEl = document.getElementById('of-msg-'+id);
+      var mensagem = (msgEl && msgEl.value.trim()) ? msgEl.value : montarMensagemRadar(ofertaEditada);
       try {
         var rw = await fetch(SERVER+'/enviar', {
           method:'POST', headers:{'Content-Type':'application/json'},
