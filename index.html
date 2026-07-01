@@ -1052,6 +1052,20 @@ function copiarEmissao(idx) {
   else fallbackCopy(texto,done);
 }
 
+
+// ── Registrar passagem no histórico ──────────────────────────────────────────
+async function registrarPassagem(dados) {
+  try {
+    await fetch(CDV_PROXY+'/passagens/registrar', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(dados)
+    });
+  } catch(e) {
+    console.warn('[Passagens] Falha ao registrar:', e.message);
+  }
+}
+
 async function enviarEmissao(idx) {
   var id='m-em-'+idx;
   var editEl=document.getElementById(id+'-msg-edit');
@@ -1081,6 +1095,21 @@ async function enviarEmissao(idx) {
     if (d.ok){
       if (d.posicao > 0){s.style.color='#f59e0b';s.textContent='⏳ Na fila (pos. '+d.posicao+' — ~'+d.tempoMin+' min)';setTimeout(function(){s.textContent='';},10000);}
       else{s.style.color='#4ade80';s.textContent='✓ Enviado!';setTimeout(function(){s.textContent='';},4000);}
+      // Registra passagem no histórico
+      var em = emissoesPendentes[idx] || {};
+      if (em.origem && em.destino && em.programa) {
+        registrarPassagem({
+          origem:      em.origem,
+          destino:     em.destino,
+          cia:         em.cia || '',
+          programa:    em.programa,
+          pontos:      em.pontos || 0,
+          cabine:      em.classe || em.cabine || '',
+          datas_ida:   em.datas_ida || em.datasIda || '',
+          datas_volta: em.datas_volta || em.datasVolta || '',
+          fonte:       'emissao'
+        });
+      }
     }
     else{s.style.color='#ff585e';s.textContent='Erro: '+(d.erro||'falha');setTimeout(function(){s.textContent='';},5000);}
   } catch(e){s.style.color='#ff585e';s.textContent='Erro: '+e.message;}
@@ -1230,6 +1259,22 @@ async function aprovarAlerta(id) {
         fb.textContent='⏳ Na fila (pos. '+d.posicao+' — ~'+d.horario+')';
       } else {
         fb.style.color='#22c55e'; fb.textContent='✓ Enviado!';
+      }
+      // Registra passagem no histórico (se for oferta de emissão)
+      var alertaObj = (typeof alertasData !== 'undefined' ? alertasData : []).find(function(o){return String(o.id)===String(id);}) || {};
+      var de = alertaObj.dadosExtraidos || {};
+      if (de.origem && de.destino && de.programa) {
+        registrarPassagem({
+          origem:      de.origem,
+          destino:     de.destino,
+          cia:         de.cia || '',
+          programa:    de.programa,
+          pontos:      de.pontos || 0,
+          cabine:      de.cabine || de.classe || '',
+          datas_ida:   de.datasIda || de.datas_ida || '',
+          datas_volta: de.datasVolta || de.datas_volta || '',
+          fonte:       'alerta'
+        });
       }
       setTimeout(carregarAlertas, 1500);
     } else {
