@@ -1339,7 +1339,8 @@ function agruparCondicoes(restricoes) {
   (restricoes || []).forEach(function(r) {
     var s = stripEmojis(r).replace(/^-\s*/, '').trim();
     if (!s) return;
-    if (/^transferências? (de|acima)/i.test(s)) volume.push(s);
+    // "volume": exige número logo após "de" ou "acima" — evita capturar "Transferências devem..."
+    if (/^transferências? (?:de \d|acima)/i.test(s)) volume.push(s);
     else if (/^\+\d+%|adicional.*tempo|há mais|entre \d.*ano/i.test(s)) tempo.push(s);
     else gerais.push(s);
   });
