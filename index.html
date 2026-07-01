@@ -833,8 +833,8 @@ function gerarOferta() {
   var prazoFmt='';
   if (prazoRaw){var pp=prazoRaw.split('-');if(pp.length===3)prazoFmt=pp[2]+'/'+pp[1]+'/'+pp[0];}
 
-  // Usa montarMensagemRadar se houver campos estruturados, senão formato simples
-  var temEstrutura = teto || restricoes.length || milheiro || programa;
+  // Usa montarMensagemRadar se houver campos estruturados OU prazo preenchido
+  var temEstrutura = teto || restricoes.length || milheiro || programa || prazoFmt;
   var msg = '';
   if (temEstrutura) {
     var obj = {
@@ -842,7 +842,7 @@ function gerarOferta() {
       resumo: corpo,
       programa: programa,
       bonus: bonus,
-      prazo: prazoFmt || (prazoRaw !== hoje() ? '' : ''),
+      prazo: prazoFmt,
       loja: loja !== LOJA_TODAS ? loja : '',
       cupom: cupom,
       importante: importante,
@@ -851,14 +851,12 @@ function gerarOferta() {
       restricoes: restricoes,
       link: link
     };
-    // Calcula prazo no formato que montarMensagemRadar espera
-    if (prazoRaw && prazoRaw !== hoje()) obj.prazo = prazoFmt;
     msg = montarMensagemRadar(obj);
   } else {
-    // Formato legado para quem preenche manualmente sem campos estruturados
+    // Formato legado para quem preenche manualmente sem nenhum campo estruturado
     if (titulo) msg += '*'+titulo+'*\n\n';
     if (corpo)  msg += corpo+'\n\n';
-    if (prazoFmt && prazoRaw !== hoje()) msg += '📆 *PRAZO* '+prazoFmt+'\n\n';
+    if (prazoFmt) msg += '📆 *PRAZO* '+prazoFmt+'\n\n';
     if (loja && loja !== LOJA_TODAS) msg += '🛒 *LOJA* '+loja+'\n\n';
     if (cupom)       msg += '🏷️ *CUPOM* '+cupom+'\n\n';
     if (importante)  msg += '⚠️ *IMPORTANTE* '+importante+'\n\n';
