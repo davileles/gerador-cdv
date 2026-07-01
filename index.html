@@ -1274,7 +1274,7 @@ async function aprovarOfertaPendente(id) {
       try {
         var rw = await fetch(SERVER+'/enviar', {
           method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ mensagem: mensagem, grupo: '120363409136599326' })
+          body: JSON.stringify({ mensagem: mensagem, grupo: '120363409136599326@g.us' })
         });
         var dw = await rw.json();
         if (dw.ok || dw.status === 'ok') {
