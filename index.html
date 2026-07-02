@@ -1099,7 +1099,7 @@ function inverterEmissao(idx) {
   tmp=di.value; di.value=dv.value; dv.value=tmp;
 }
 
-function gerarMensagemEmissao(idx) {
+async function gerarMensagemEmissao(idx) {
   var id='m-em-'+idx;
   var origem=document.getElementById(id+'-origem').value.trim();
   var destino=document.getElementById(id+'-destino').value.trim();
@@ -1118,6 +1118,47 @@ function gerarMensagemEmissao(idx) {
   var valorStr=valorReais>0?'R$ '+valorReais.toLocaleString('pt-BR'):'—';
   var linkProg=PROGRAMAS_LINK[programa]||'';
   var trechoInfo=tipo==='internacional'?' o trecho em '+classe:'';
+
+  // ── Buscar histórico da rota para calcular mínimo e média 180 dias ───────────
+  var blocoHistorico = '';
+  try {
+    var passRes = await fetch(CDV_PROXY+'/passagens/listar?t='+Date.now(), {
+      cache: 'no-cache', signal: AbortSignal.timeout(5000)
+    });
+    if (passRes.ok) {
+      var passData = await passRes.json();
+      var todos = passData.items || [];
+      var corteMs = Date.now() - 180 * 24 * 60 * 60 * 1000;
+      // Filtra: mesma rota + programa + cabine, últimos 180 dias
+      var chaveAtual = [origem.toLowerCase(), destino.toLowerCase(), programa.toLowerCase(), (classe||'').toLowerCase()].join('|');
+      var hist180 = todos.filter(function(h){
+        var chaveH = [(h.origem||'').toLowerCase(), (h.destino||'').toLowerCase(), (h.programa||'').toLowerCase(), (h.cabine||'').toLowerCase()].join('|');
+        return chaveH === chaveAtual && new Date(h.enviadoEm).getTime() >= corteMs;
+      });
+      if (hist180.length >= 1) {
+        var pontosArr = hist180.map(function(h){ return h.pontos; }).filter(function(v){ return v > 0; });
+        var minPts = Math.min.apply(null, pontosArr);
+        var mediaPts = Math.round(pontosArr.reduce(function(a,b){ return a+b; }, 0) / pontosArr.length);
+        var diffMedia = pontos - mediaPts;
+        var pctMedia = mediaPts > 0 ? Math.round(Math.abs(diffMedia)/mediaPts*100) : 0;
+        var mediaTag = diffMedia < 0
+          ? '📉 ' + pctMedia + '% abaixo da média histórica'
+          : diffMedia > 0
+            ? '📈 ' + pctMedia + '% acima da média histórica'
+            : '= na média histórica';
+        var minTag = pontos === minPts
+          ? '🏆 Melhor preço histórico registrado!'
+          : '🏆 Mín. histórico: ' + minPts.toLocaleString('pt-BR') + ' pts';
+        blocoHistorico =
+          '📊 *HISTÓRICO DA ROTA* (' + hist180.length + ' emissões em 180 dias)\n' +
+          minTag + '\n' +
+          '📊 Média 180d: ' + mediaPts.toLocaleString('pt-BR') + ' pts — ' + mediaTag;
+      }
+    }
+  } catch(e) {
+    console.warn('[Histórico] Falha ao buscar passagens:', e.message);
+  }
+
   var msg='*'+origem+' - '+destino+' por '+pontos.toLocaleString('pt-BR')+' pontos OU '+valorStr+trechoInfo+'*\n\n';
   msg+=RODAPE_MILHAS+'\n\n';
   msg+='Você pode comprar essa passagem no Balcão de Milhas CDV por aproximadamente '+valorStr+' o trecho + taxa de embarque.\n\n';
@@ -1127,6 +1168,7 @@ function gerarMensagemEmissao(idx) {
   msg+='🎟️ *PROGRAMA* '+programa+'\n\n';
   msg+='✈️ *CIA AÉREA* '+cia+'\n\n';
   msg+='🔗 *LINK* '+linkProg+'\n\n';
+  if (blocoHistorico) msg+=blocoHistorico+'\n\n';
   msg+=RODAPE_MILHAS;
   var editEl=document.getElementById(id+'-msg-edit');
   editEl.value=msg; editEl.style.height='auto'; editEl.style.height=editEl.scrollHeight+'px';
