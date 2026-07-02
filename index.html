@@ -603,6 +603,90 @@ async function analisarOferta() {
     if (!url) { okEl.style.color='#ff585e'; okEl.textContent='Cole um link antes.'; return; }
     btn.textContent='⏳ Buscando...'; btn.disabled=true;
     okEl.style.color='var(--muted)'; okEl.textContent='Buscando conteúdo da página...';
+
+    // ── Detecção de PDF direto via link ──────────────────────────────────────
+    var isPdfUrl = /\.pdf(\?.*)?$/i.test(url);
+    if (isPdfUrl) {
+      okEl.textContent='PDF detectado — baixando para análise...';
+      try {
+        // Tenta buscar o PDF como blob — primeiro direto, depois via cors proxies
+        var pdfBlob = null;
+        var pdfFetchSources = [
+          url, // direto (funciona se não tiver CORS block)
+          'https://corsproxy.io/?'+encodeURIComponent(url),
+          'https://api.allorigins.win/raw?url='+encodeURIComponent(url)
+        ];
+        for (var pfi=0; pfi<pdfFetchSources.length && !pdfBlob; pfi++) {
+          try {
+            var pdfRes = await fetch(pdfFetchSources[pfi], {signal:AbortSignal.timeout(20000)});
+            if (pdfRes.ok) {
+              var ct = pdfRes.headers.get('content-type')||'';
+              if (ct.includes('pdf') || pfi===0 || pfi>=1) pdfBlob = await pdfRes.blob();
+            }
+          } catch(epfi){ console.warn('[PDF fetch] fonte '+pfi+' falhou:', epfi.message); }
+        }
+        if (!pdfBlob) throw new Error('nenhuma fonte conseguiu baixar o PDF');
+        var pdfReader = new FileReader();
+        var pdfB64 = await new Promise(function(res, rej) {
+          pdfReader.onload = function(e){ res(e.target.result.split(',')[1]); };
+          pdfReader.onerror = rej;
+          pdfReader.readAsDataURL(pdfBlob);
+        });
+        okEl.textContent='PDF carregado — analisando com IA...';
+        var fc = {type:'document',source:{type:'base64',media_type:'application/pdf',data:pdfB64}};
+        messages = [{role:'user',content:[fc,{type:'text',text:'Extraia as informações desta oferta. URL de origem (use como fallback para o campo link se não encontrar outro): '+url+'\n\n'+PROMPT}]}];
+        var useSearchPdf = false;
+        try {
+          var obj = await chamarIA(messages, useSearchPdf);
+          function normalizarParceiros2(str) {
+            if (!str) return str;
+            return str.replace(/\bHTC\b/gi, 'Hoteis.com').replace(/\bHotel Urbano\b/gi, 'Hoteis.com');
+          }
+          obj.titulo=normalizarParceiros2(obj.titulo); obj.descricao=normalizarParceiros2(obj.descricao);
+          obj.loja=normalizarParceiros2(obj.loja); obj.cupom=normalizarParceiros2(obj.cupom);
+          obj.importante=normalizarParceiros2(obj.importante); obj.link=normalizarParceiros2(obj.link);
+          ['o-titulo','o-corpo','o-prazo','o-loja','o-cupom','o-importante','o-link','o-programa','o-bonus','o-milheiro','o-teto','o-restricoes','o-categoria'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=id==='o-categoria'?'geral':''; });
+          if (obj.titulo)     document.getElementById('o-titulo').value=obj.titulo;
+          if (obj.resumo && obj.descricao) { document.getElementById('o-corpo').value = obj.resumo + '\n\n' + obj.descricao; }
+          else if (obj.resumo) { document.getElementById('o-corpo').value = obj.resumo; }
+          else if (obj.descricao) { document.getElementById('o-corpo').value = obj.descricao; }
+          if (obj.loja)       document.getElementById('o-loja').value=obj.loja;
+          if (obj.cupom)      document.getElementById('o-cupom').value=obj.cupom;
+          if (obj.importante) document.getElementById('o-importante').value=obj.importante;
+          if (obj.link)       document.getElementById('o-link').value=obj.link;
+          else                document.getElementById('o-link').value=url;
+          if (obj.programa)   document.getElementById('o-programa').value=obj.programa;
+          if (obj.bonus)      document.getElementById('o-bonus').value=obj.bonus;
+          if (obj.milheiro)   document.getElementById('o-milheiro').value=obj.milheiro;
+          if (obj.tetoTransferencia) document.getElementById('o-teto').value=obj.tetoTransferencia;
+          if (obj.categoria)  { var cEl2=document.getElementById('o-categoria'); if(cEl2) cEl2.value=obj.categoria; }
+          if (obj.restricoes && Array.isArray(obj.restricoes) && obj.restricoes.length) {
+            document.getElementById('o-restricoes').value=obj.restricoes.join('\n');
+          }
+          if (obj.prazo && obj.prazo.trim()) {
+            var prazoStr2 = obj.prazo.trim();
+            var anoAtual2 = new Date().getFullYear();
+            var dia2='', mes2='', ano2='';
+            var m3b = prazoStr2.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+            if (m3b) { dia2=m3b[1]; mes2=m3b[2]; ano2=m3b[3]; }
+            else { var m2b = prazoStr2.match(/(\d{1,2})\/(\d{1,2})/); if (m2b) { dia2=m2b[1]; mes2=m2b[2]; ano2=anoAtual2; } }
+            if (dia2 && mes2) { document.getElementById('o-prazo').value = ano2+'-'+String(mes2).padStart(2,'0')+'-'+String(dia2).padStart(2,'0'); }
+          }
+          gerarOferta();
+          okEl.style.color='#4ade80'; okEl.textContent='✓ PDF analisado com sucesso!';
+          setTimeout(function(){okEl.textContent='';},5000);
+        } catch(eAi) {
+          okEl.style.color='#ff585e'; okEl.textContent='Erro na IA: '+eAi.message;
+        }
+        btn.textContent='🔍 Analisar'; btn.disabled=false;
+        return; // Sai da função — não precisa continuar o fluxo de HTML
+      } catch(ePdf) {
+        console.warn('[PDF direto] Falhou:', ePdf.message);
+        okEl.textContent='Não foi possível baixar o PDF diretamente. Tentando como página...';
+      }
+    }
+    // ── Fim detecção PDF ─────────────────────────────────────────────────────
+
     var html = '';
 
     // 1. Tenta o proxy CDV — endpoint /fetch-oferta (sem restrição de domínio)
