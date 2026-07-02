@@ -1376,6 +1376,7 @@ function renderOfertaPendenteCard(o) {
         +'<div class="field"><label>Cupom</label><input id="of-cupom-'+o.id+'" value="'+escapeAttr(o.cupom)+'" oninput="atualizarPrevia(\''+o.id+'\')"/></div>'
       +'</div>'
       +'<div class="field"><label>Resumo</label><textarea id="of-resumo-'+o.id+'" style="min-height:70px" oninput="atualizarPrevia(\''+o.id+'\')">'+escapeHtml(o.resumo)+'</textarea></div>'
+      +'<div class="field"><label>Descrição (lista de parceiros)</label><textarea id="of-descricao-'+o.id+'" style="min-height:120px" oninput="atualizarPrevia(\''+o.id+'\')">'+escapeHtml(o.descricao||'')+'</textarea></div>'
       +'<div class="field"><label>Custo do milheiro</label><textarea id="of-milheiro-'+o.id+'" style="min-height:50px" oninput="atualizarPrevia(\''+o.id+'\')">'+escapeHtml(o.milheiro)+'</textarea></div>'
       +'<div class="field"><label>Teto de bônus (transferência)</label><textarea id="of-teto-'+o.id+'" style="min-height:50px" oninput="atualizarPrevia(\''+o.id+'\')">'+escapeHtml(o.tetoTransferencia)+'</textarea></div>'
       +'<div class="field"><label>Restrições / condições (uma por linha)</label><textarea id="of-restricoes-'+o.id+'" style="min-height:110px" oninput="atualizarPrevia(\''+o.id+'\')">'+escapeHtml(restricoesTxt)+'</textarea></div>'
@@ -1419,6 +1420,7 @@ function coletarEdicoesOferta(id) {
     loja: get('loja'),
     cupom: get('cupom'),
     resumo: get('resumo'),
+    descricao: get('descricao'),
     milheiro: get('milheiro'),
     tetoTransferencia: get('teto'),
     restricoes: restricoes,
@@ -1464,6 +1466,9 @@ function montarMensagemRadar(o) {
 
   // Resumo
   if (o.resumo) msg += stripEmojis(o.resumo) + '\n\n';
+
+  // Descrição (lista de parceiros — gerada pelo coletar.js)
+  if (o.descricao) msg += o.descricao + '\n\n';
 
   // Custo do milheiro
   if (o.milheiro) {
