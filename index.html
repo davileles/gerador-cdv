@@ -1316,12 +1316,9 @@ async function carregarOfertasPendentes() {
   var lista = document.getElementById('ofertas-lista');
   lista.innerHTML = '<div class="alerta-empty">Carregando...</div>';
   try {
-    // Busca via proxy Railway para evitar CORS
-    var proxyUrl = CDV_PROXY+'/fetch?url='+encodeURIComponent(OFERTAS_PENDENTES_URL+'?t='+Date.now());
-    var r = await fetch(proxyUrl, {cache:'no-cache', signal:AbortSignal.timeout(15000)});
+    var r = await fetch(CDV_PROXY+'/ofertas/pendentes?t='+Date.now(), {cache:'no-cache', signal:AbortSignal.timeout(15000)});
     if (!r.ok) throw new Error('status '+r.status);
-    var text = await r.text();
-    var data = JSON.parse(text);
+    var data = await r.json();
     ofertasPendentesData = data.items || [];
     renderOfertasPendentes();
     atualizarBadgeOfertas();
@@ -1796,7 +1793,7 @@ function verificarServidor(){
 // Verifica silenciosamente o número de ofertas pendentes para atualizar o badge
 // sem precisar que o usuário esteja na aba "Aprovar Ofertas"
 function verificarOfertasPendentes(){
-  fetch(CDV_PROXY+'/fetch?url='+encodeURIComponent(OFERTAS_PENDENTES_URL+'?t='+Date.now()),{cache:'no-cache',signal:AbortSignal.timeout(5000)})
+  fetch(CDV_PROXY+'/ofertas/pendentes?t='+Date.now(),{cache:'no-cache',signal:AbortSignal.timeout(5000)})
     .then(function(r){ return r.ok ? r.json() : null; })
     .then(function(data){
       if (!data) return;
