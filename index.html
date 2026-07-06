@@ -192,6 +192,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator{filter:invert(.5
           <button id="ai-clear-btn" style="margin-top:6px;padding:4px 12px;background:var(--surface2);color:var(--muted);border:1px solid var(--border2);border-radius:6px;font-family:var(--font);font-size:12px;cursor:pointer">✕ Remover arquivo</button>
         </div>
       </div>
+      <div class="field" style="margin-bottom:10px">
+        <label>Contexto adicional <span class="tag" style="text-transform:none">opcional — explique o que está na imagem</span></label>
+        <textarea id="ai-img-contexto" rows="3" placeholder="Ex: Imagem do app PicPay mostrando cashback em restaurantes. Os cashbacks são válidos para pagamentos com PicPay Card." style="width:100%;box-sizing:border-box;resize:vertical"></textarea>
+      </div>
     </div>
     <button class="btn btn-blue" id="url-btn">🤖 Analisar e preencher campos</button>
     <p class="ok" id="url-ok" style="color:var(--muted);min-height:18px;margin-top:8px"></p>
@@ -783,7 +787,9 @@ async function analisarOferta() {
     btn.textContent='⏳ Analisando...'; btn.disabled=true;
     okEl.style.color='var(--muted)'; okEl.textContent='Analisando arquivo...';
     var fc = aiPdf ? {type:'document',source:{type:'base64',media_type:'application/pdf',data:aiB64}} : {type:'image',source:{type:'base64',media_type:aiType,data:aiB64}};
-    messages = [{role:'user',content:[fc,{type:'text',text:'Extraia as informações desta oferta.\n\n'+PROMPT}]}];
+    var imgCtx = (document.getElementById('ai-img-contexto').value||'').trim();
+    var imgInstrucao = imgCtx ? 'Contexto informado pelo usuário: '+imgCtx+'\n\nExtraia as informações desta oferta.\n\n'+PROMPT : 'Extraia as informações desta oferta.\n\n'+PROMPT;
+    messages = [{role:'user',content:[fc,{type:'text',text:imgInstrucao}]}];
   }
 
   var useSearch = currentMode === 'link';
@@ -2033,3 +2039,4 @@ window.addEventListener('DOMContentLoaded', function() {
 </div>
 </body>
 </html>
+
