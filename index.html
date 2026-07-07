@@ -1670,6 +1670,13 @@ async function aprovarOfertaPendente(id) {
       var espera = decorrido >= RADAR_INTERVALO_MS ? 0 : RADAR_INTERVALO_MS - decorrido;
       var minTotal = Math.round((espera + posicao * RADAR_INTERVALO_MS) / 60000);
 
+      // Desabilitar card IMEDIATAMENTE ao aprovar — independente de quando o envio ocorrer
+      var cardImediato = document.getElementById('oferta-card-'+id);
+      if (cardImediato) {
+        cardImediato.style.opacity = '.35';
+        cardImediato.style.pointerEvents = 'none';
+      }
+
       if (posicao === 0 && _radarFilaEnvio.length === 0 && (_radarUltimoEnvio === 0 || decorrido >= RADAR_INTERVALO_MS)) {
         // Primeira aprovação ou intervalo já passou — envio imediato
         fb.style.color='#22c55e'; fb.textContent='✓ Aprovada! Enviando...';
