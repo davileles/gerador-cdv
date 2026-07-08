@@ -1118,7 +1118,7 @@ async function ensureHistorico(force) {
   var agora = Date.now();
   if (!force && _passagensCache && (agora - _passagensCacheTs) < PASSAGENS_CACHE_MS) return _passagensCache;
   try {
-    var r = await fetch(CDV_PROXY + '/passagens/listar');
+    var r = await fetch(CDV_PROXY + '/passagens/listar', {signal:AbortSignal.timeout(8000)});
     var d = await r.json();
     _passagensCache = Array.isArray(d.items) ? d.items : [];
     _passagensCacheTs = agora;
@@ -1177,7 +1177,7 @@ function inserirBlocoHistorico(msg, dados) {
   return msg.slice(0, idx + 2) + bloco + '\n\n' + msg.slice(idx + 2);
 }
 
-async function gerarMensagemEmissao(idx) {
+function gerarMensagemEmissao(idx) {
   var id='m-em-'+idx;
   var origem=document.getElementById(id+'-origem').value.trim();
   var destino=document.getElementById(id+'-destino').value.trim();
@@ -1206,14 +1206,19 @@ async function gerarMensagemEmissao(idx) {
   msg+='✈️ *CIA AÉREA* '+cia+'\n\n';
   msg+='🔗 *LINK* '+linkProg+'\n\n';
   msg+=RODAPE_MILHAS;
-  await ensureHistorico();
-  msg=inserirBlocoHistorico(msg,{origem:origem,destino:destino,programa:programa,cabine:classe,cia:cia,pontos:pontos});
   var editEl=document.getElementById(id+'-msg-edit');
   editEl.value=msg; editEl.style.height='auto'; editEl.style.height=editEl.scrollHeight+'px';
   var resultCard=document.getElementById(id+'-result');
   resultCard.style.display='block';
   setTimeout(function(){ resultCard.scrollIntoView({behavior:'smooth',block:'nearest'}); },50);
   document.getElementById(id+'-ok').textContent='';
+  // enriquece com o histórico da rota sem bloquear a exibição
+  var msgBase=msg;
+  ensureHistorico().then(function(){
+    if (editEl.value!==msgBase) return; // usuário já editou; não sobrescreve
+    var comHist=inserirBlocoHistorico(msgBase,{origem:origem,destino:destino,programa:programa,cabine:classe,cia:cia,pontos:pontos});
+    if (comHist!==msgBase){ editEl.value=comHist; editEl.style.height='auto'; editEl.style.height=editEl.scrollHeight+'px'; }
+  });
 }
 
 function copiarEmissao(idx) {
@@ -1305,9 +1310,13 @@ async function carregarAlertas() {
     var data = await r.json();
     alertasData = data.ofertas || [];
     window._alertasCache = alertasData;
-    await ensureHistorico();
+    var _tsHist=_passagensCacheTs;
     renderAlertas(data);
     atualizarBadge();
+    // carrega histórico sem bloquear; re-renderiza só se algo novo chegou
+    ensureHistorico().then(function(){
+      if (_passagensCacheTs!==_tsHist){ renderAlertas(data); atualizarBadge(); }
+    });
   } catch(e) {
     document.getElementById('alertas-lista').innerHTML = '<div class="alerta-empty">⚠️ Não foi possível carregar os alertas. Verifique a conexão com o servidor.</div>';
   }
