@@ -1168,10 +1168,12 @@ function blocoHistorico(dados) {
   return '📊 *MÉDIA* ' + fmt(h.media) + ' pontos\n\n🥇 *MENOR REGISTRADO* ' + fmt(h.menor) + ' pontos';
 }
 
-// insere o bloco logo após o título (primeira linha em branco) da mensagem
+// insere o bloco logo abaixo da CIA e acima do LINK (fallback: após o título)
 function inserirBlocoHistorico(msg, dados) {
   var bloco = blocoHistorico(dados);
   if (!bloco) return msg;
+  var marc = msg.indexOf('🔗 *LINK*');
+  if (marc !== -1) return msg.slice(0, marc) + bloco + '\n\n' + msg.slice(marc);
   var idx = msg.indexOf('\n\n');
   if (idx === -1) return msg + '\n\n' + bloco;
   return msg.slice(0, idx + 2) + bloco + '\n\n' + msg.slice(idx + 2);
