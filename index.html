@@ -1109,7 +1109,75 @@ function inverterEmissao(idx) {
   tmp=di.value; di.value=dv.value; dv.value=tmp;
 }
 
-function gerarMensagemEmissao(idx) {
+// ══ HISTÓRICO DE ROTA (menor valor / média 180 dias) ══
+var _passagensCache = null, _passagensCacheTs = 0;
+var PASSAGENS_CACHE_MS = 3 * 60 * 1000;
+var HIST_MIN_AMOSTRAS = 2; // mínimo de emissões p/ mostrar o bloco
+
+async function ensureHistorico(force) {
+  var agora = Date.now();
+  if (!force && _passagensCache && (agora - _passagensCacheTs) < PASSAGENS_CACHE_MS) return _passagensCache;
+  try {
+    var r = await fetch(CDV_PROXY + '/passagens/listar');
+    var d = await r.json();
+    _passagensCache = Array.isArray(d.items) ? d.items : [];
+    _passagensCacheTs = agora;
+  } catch (e) {
+    console.warn('[Historico] Falha ao carregar passagens:', e.message);
+    if (!_passagensCache) _passagensCache = [];
+  }
+  return _passagensCache;
+}
+
+// normaliza p/ comparação: sem acento, minúsculo, sem espaços extras
+function _normHist(s) {
+  return (s == null ? '' : String(s)).normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+}
+
+// calcula estatísticas da rota (mesma origem/destino/programa/cabine/cia) nos últimos 180 dias
+function calcularHistoricoRota(dados) {
+  var items = _passagensCache || [];
+  var o = _normHist(dados.origem), d = _normHist(dados.destino), pr = _normHist(dados.programa);
+  var cab = _normHist(dados.cabine), ci = _normHist(dados.cia);
+  if (!o || !d || !pr) return null;
+  var m = items.filter(function (p) {
+    if (_normHist(p.origem) !== o) return false;
+    if (_normHist(p.destino) !== d) return false;
+    if (_normHist(p.programa) !== pr) return false;
+    if (cab && _normHist(p.cabine) !== cab) return false;
+    if (ci && _normHist(p.cia) !== ci) return false;
+    return true;
+  });
+  var pts = m.map(function (p) { return Number(p.pontos) || 0; }).filter(function (x) { return x > 0; });
+  if (pts.length < HIST_MIN_AMOSTRAS) return null;
+  var menor = Math.min.apply(null, pts);
+  var soma = pts.reduce(function (a, b) { return a + b; }, 0);
+  return { n: pts.length, menor: menor, media: Math.round(soma / pts.length) };
+}
+
+// monta o bloco de texto do histórico (ou '' se não houver dados suficientes)
+function blocoHistorico(dados) {
+  var h = calcularHistoricoRota(dados);
+  if (!h) return '';
+  var atual = Number(dados.pontos) || 0;
+  var fmt = function (x) { return x.toLocaleString('pt-BR'); };
+  if (atual > 0 && atual <= h.menor) {
+    var pct = h.media > 0 ? Math.round((h.media - atual) / h.media * 100) : 0;
+    return '🔥 *MENOR VALOR HISTÓRICO* ' + (pct > 0 ? pct + '% abaixo da média de ' + fmt(h.media) + ' pontos' : 'média de ' + fmt(h.media) + ' pontos');
+  }
+  return '📊 *MÉDIA* ' + fmt(h.media) + ' pontos\n\n🥇 *MENOR REGISTRADO* ' + fmt(h.menor) + ' pontos';
+}
+
+// insere o bloco logo após o título (primeira linha em branco) da mensagem
+function inserirBlocoHistorico(msg, dados) {
+  var bloco = blocoHistorico(dados);
+  if (!bloco) return msg;
+  var idx = msg.indexOf('\n\n');
+  if (idx === -1) return msg + '\n\n' + bloco;
+  return msg.slice(0, idx + 2) + bloco + '\n\n' + msg.slice(idx + 2);
+}
+
+async function gerarMensagemEmissao(idx) {
   var id='m-em-'+idx;
   var origem=document.getElementById(id+'-origem').value.trim();
   var destino=document.getElementById(id+'-destino').value.trim();
@@ -1138,6 +1206,8 @@ function gerarMensagemEmissao(idx) {
   msg+='✈️ *CIA AÉREA* '+cia+'\n\n';
   msg+='🔗 *LINK* '+linkProg+'\n\n';
   msg+=RODAPE_MILHAS;
+  await ensureHistorico();
+  msg=inserirBlocoHistorico(msg,{origem:origem,destino:destino,programa:programa,cabine:classe,cia:cia,pontos:pontos});
   var editEl=document.getElementById(id+'-msg-edit');
   editEl.value=msg; editEl.style.height='auto'; editEl.style.height=editEl.scrollHeight+'px';
   var resultCard=document.getElementById(id+'-result');
@@ -1235,6 +1305,7 @@ async function carregarAlertas() {
     var data = await r.json();
     alertasData = data.ofertas || [];
     window._alertasCache = alertasData;
+    await ensureHistorico();
     renderAlertas(data);
     atualizarBadge();
   } catch(e) {
@@ -1282,6 +1353,17 @@ function renderAlertas(data) {
   }
 }
 
+// monta a mensagem do alerta já com o bloco de histórico da rota
+function mensagemAlertaComHistorico(o) {
+  var msg = o.mensagemFormatada || '';
+  var d = o.dadosExtraidos || {};
+  if (!d.origem || !d.destino || !d.programa) return msg;
+  return inserirBlocoHistorico(msg, {
+    origem: d.origem, destino: d.destino, programa: d.programa,
+    cabine: d.cabine || d.classe || '', cia: d.cia || '', pontos: d.pontos || 0
+  });
+}
+
 function renderAlertaCard(o) {
   var d = o.dadosExtraidos || {};
   var data = new Date(o.timestamp).toLocaleString('pt-BR');
@@ -1304,7 +1386,7 @@ function renderAlertaCard(o) {
     +'<div class="alerta-body">'
     +'<div class="alerta-col"><div class="alerta-col-title">Original ('+o.tipoConteudo+')</div>'+origemCol+'</div>'
     +'<div class="alerta-col"><div class="alerta-col-title">Mensagem formatada</div>'
-    +'<textarea class="alerta-edit" id="alerta-msg-'+o.id+'">'+escapeHtml(o.mensagemFormatada||'')+'</textarea>'
+    +'<textarea class="alerta-edit" id="alerta-msg-'+o.id+'">'+escapeHtml(mensagemAlertaComHistorico(o))+'</textarea>'
     +'</div>'
     +'</div>'
     +'<div class="alerta-footer">'
