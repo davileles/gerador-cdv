@@ -1161,11 +1161,10 @@ function blocoHistorico(dados) {
   if (!h) return '';
   var atual = Number(dados.pontos) || 0;
   var fmt = function (x) { return x.toLocaleString('pt-BR'); };
-  if (atual > 0 && atual <= h.menor) {
-    var pct = h.media > 0 ? Math.round((h.media - atual) / h.media * 100) : 0;
-    return '🔥 *MENOR VALOR HISTÓRICO* ' + (pct > 0 ? pct + '% abaixo da média de ' + fmt(h.media) + ' pontos' : 'média de ' + fmt(h.media) + ' pontos');
-  }
-  return '📊 *MÉDIA* ' + fmt(h.media) + ' pontos\n\n🥇 *MENOR REGISTRADO* ' + fmt(h.menor) + ' pontos';
+  var minLinha = (atual > 0 && atual <= h.menor)
+    ? '🏆 *MÍN. 180 DIAS*: ' + fmt(h.menor) + ' pts ➤ 🔥 Menor valor histórico'
+    : '🏆 *MÍN. 180 DIAS*: ' + fmt(h.menor) + ' pts';
+  return minLinha + '\n\n📈 *MÉDIA 180 DIAS*: ' + fmt(h.media) + ' pts';
 }
 
 // insere o bloco logo abaixo da CIA e acima do LINK (fallback: após o título)
