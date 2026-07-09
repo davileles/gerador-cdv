@@ -1171,6 +1171,8 @@ function blocoHistorico(dados) {
 function inserirBlocoHistorico(msg, dados) {
   var bloco = blocoHistorico(dados);
   if (!bloco) return msg;
+  // Evita duplicação: se o bloco já está na mensagem, não insere novamente
+  if (msg.indexOf('🏆 *MÍN. 180 DIAS*') !== -1) return msg;
   var marc = msg.indexOf('🔗 *LINK*');
   if (marc !== -1) return msg.slice(0, marc) + bloco + '\n\n' + msg.slice(marc);
   var idx = msg.indexOf('\n\n');
