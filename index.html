@@ -1492,6 +1492,22 @@ async function rejeitarAlerta(id) {
       fb.style.color='var(--muted2)'; fb.textContent='Rejeitado';
       var card = document.getElementById('alerta-card-'+id);
       if (card) { card.style.opacity='.25'; card.style.pointerEvents='none'; }
+      // Registra passagem mesmo rejeitada (para mapa histórico futuro)
+      var alertaObj = (typeof alertasData !== 'undefined' ? alertasData : []).find(function(o){return String(o.id)===String(id);}) || {};
+      var de = alertaObj.dadosExtraidos || {};
+      if (de.origem && de.destino && de.programa) {
+        registrarPassagem({
+          origem:      de.origem,
+          destino:     de.destino,
+          cia:         de.cia || '',
+          programa:    de.programa,
+          pontos:      de.pontos || 0,
+          cabine:      de.cabine || de.classe || '',
+          datas_ida:   de.datasIda || de.datas_ida || '',
+          datas_volta: de.datasVolta || de.datas_volta || '',
+          fonte:       'alerta_rejeitado'
+        });
+      }
       setTimeout(carregarAlertas, 1500);
     } else {
       fb.style.color='#ff585e'; fb.textContent='Erro: '+(d.erro||'falha (status '+r.status+')');
