@@ -1405,7 +1405,7 @@ function renderAlertaCard(o) {
     +'<button class="btn btn-aprovar" style="flex:1;padding:10px" onclick="aprovarAlerta('+o.id+')">✓ Aprovar e enviar</button>'
     +'<button class="btn" style="flex:0 0 auto;padding:10px 16px;background:#0ea5e9;color:#fff" onclick="reprocessarAlerta('+o.id+')">🔄 Reprocessar</button>'
     +'<button class="btn" style="flex:0 0 auto;padding:10px 16px;background:#7c3aed;color:#fff" onclick="abrirMesclar('+o.id+')">🔗 Mesclar</button>'
-    +'<button class="btn btn-rejeitar" style="flex:0 0 auto;padding:10px 16px" onclick="rejeitarAlerta('+o.id+')">Rejeitar</button>'
+    +'<button class="btn btn-rejeitar" style="flex:0 0 auto;padding:10px 16px" onclick="rejeitarAlerta('+o.id+',true)">💾 Rejeitar e Salvar</button>'+'<button class="btn btn-rejeitar" style="flex:0 0 auto;padding:10px 16px;opacity:.7" onclick="rejeitarAlerta('+o.id+',false)">✕ Rejeitar</button>'
     +'<span class="alerta-fb" id="alerta-fb-'+o.id+'"></span>'
     +'</div>'
     +'<div style="padding:0 14px 12px;border-top:1px solid var(--border)">'
@@ -1482,31 +1482,33 @@ async function aprovarAlerta(id) {
   } catch(e) { fb.style.color='#ff585e'; fb.textContent='Sem resposta.'; }
 }
 
-async function rejeitarAlerta(id) {
+async function rejeitarAlerta(id, salvar) {
   var fb = document.getElementById('alerta-fb-'+id);
   fb.style.color='var(--muted)'; fb.textContent='Rejeitando...';
   try {
     var r = await fetch(SERVER+'/painel/rejeitar/'+id, {method:'POST'});
     var d = await r.json();
     if (d.ok) {
-      fb.style.color='var(--muted2)'; fb.textContent='Rejeitado';
+      fb.style.color='var(--muted2)'; fb.textContent=salvar ? 'Rejeitado e salvo' : 'Rejeitado';
       var card = document.getElementById('alerta-card-'+id);
       if (card) { card.style.opacity='.25'; card.style.pointerEvents='none'; }
-      // Registra passagem mesmo rejeitada (para mapa histórico futuro)
-      var alertaObj = (typeof alertasData !== 'undefined' ? alertasData : []).find(function(o){return String(o.id)===String(id);}) || {};
-      var de = alertaObj.dadosExtraidos || {};
-      if (de.origem && de.destino && de.programa) {
-        registrarPassagem({
-          origem:      de.origem,
-          destino:     de.destino,
-          cia:         de.cia || '',
-          programa:    de.programa,
-          pontos:      de.pontos || 0,
-          cabine:      de.cabine || de.classe || '',
-          datas_ida:   de.datasIda || de.datas_ida || '',
-          datas_volta: de.datasVolta || de.datas_volta || '',
-          fonte:       'alerta_rejeitado'
-        });
+      // Só registra em passagens.json se o usuário escolheu "Rejeitar e Salvar"
+      if (salvar) {
+        var alertaObj = (typeof alertasData !== 'undefined' ? alertasData : []).find(function(o){return String(o.id)===String(id);}) || {};
+        var de = alertaObj.dadosExtraidos || {};
+        if (de.origem && de.destino && de.programa) {
+          registrarPassagem({
+            origem:      de.origem,
+            destino:     de.destino,
+            cia:         de.cia || '',
+            programa:    de.programa,
+            pontos:      de.pontos || 0,
+            cabine:      de.cabine || de.classe || '',
+            datas_ida:   de.datasIda || de.datas_ida || '',
+            datas_volta: de.datasVolta || de.datas_volta || '',
+            fonte:       'alerta_rejeitado'
+          });
+        }
       }
       setTimeout(carregarAlertas, 1500);
     } else {
