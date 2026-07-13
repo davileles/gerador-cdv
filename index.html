@@ -1326,7 +1326,7 @@ async function carregarAlertas() {
 }
 
 function atualizarBadge() {
-  var pendentes = alertasData.filter(function(o){ return o.status === 'pendente'; }).length;
+  var pendentes = alertasData.filter(function(o){ return o.status === 'pendente' && !(o.grupoOrigem||'').startsWith('telegram:'); }).length;
   var badge = document.getElementById('alertas-badge');
   if (pendentes > 0) { badge.textContent = pendentes; badge.style.display = 'inline-block'; }
   else { badge.style.display = 'none'; }
@@ -1341,7 +1341,7 @@ function renderAlertas(data) {
     bufferTxt.textContent = emBuffer + ' item(s) aguardando janela de 3 min...';
   } else { bufferBar.style.display = 'none'; }
 
-  var ofertas = data.ofertas || [];
+  var ofertas = (data.ofertas || []).filter(function(o){ return !(o.grupoOrigem||'').startsWith('telegram:'); });
   var pendentes = ofertas.filter(function(o){ return o.status === 'pendente'; });
   var processados = ofertas.filter(function(o){ return o.status !== 'pendente'; });
 
