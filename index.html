@@ -1534,9 +1534,18 @@ async function carregarOfertasPendentes() {
 }
 
 function atualizarBadgeOfertas() {
+  var ativas = ofertasPendentesData.filter(function(o){ return !prazoVencido(o.prazo); });
   var badge = document.getElementById('ofertas-badge');
-  if (ofertasPendentesData.length > 0) { badge.textContent = ofertasPendentesData.length; badge.style.display = 'inline-block'; }
+  if (ativas.length > 0) { badge.textContent = ativas.length; badge.style.display = 'inline-block'; }
   else { badge.style.display = 'none'; }
+}
+
+function prazoVencido(prazoStr) {
+  if (!prazoStr || prazoStr.toLowerCase() === 'não informado') return false;
+  var m = prazoStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!m) return false;
+  var encerramento = new Date(Number(m[3]), Number(m[2])-1, Number(m[1]), 23, 59, 59);
+  return encerramento < new Date();
 }
 
 function renderOfertasPendentes() {
@@ -1558,11 +1567,13 @@ function renderOfertaPendenteCard(o) {
   var data = o.publicadoEm ? new Date(o.publicadoEm).toLocaleString('pt-BR') : '';
   var restricoesTxt = (o.restricoes||[]).join('\n');
   var msgPrevia = escapeHtml(montarMensagemRadar(o));
-  return '<div class="alerta-card" id="oferta-card-'+o.id+'">'
+  var vencida = prazoVencido(o.prazo);
+  var cardStyle = vencida ? ' style="border-color:#7f1d1d;opacity:.75"' : '';
+  var badgeEncerrada = vencida ? '<span style="background:#7f1d1d;color:#fca5a5;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.5px">&#9888;&#65039; ENCERRADA</span>' : '';
+  return '<div class="alerta-card" id="oferta-card-'+o.id+'"'+cardStyle+'>'
     +'<div class="alerta-header">'
     +'<span class="alerta-id">'+(o.emoji||'📰')+'</span>'
-    +'<span class="alerta-rota">'+escapeHtml(o.titulo||'')+'</span>'
-    +'<span class="alerta-time">'+data+'</span>'
+    +'<span class="alerta-rota">'+escapeHtml(o.titulo||'')+'</span>'    +badgeEncerrada    +'<span class="alerta-time">'+data+'</span>'
     +'</div>'
     +'<div style="padding:14px;display:flex;flex-direction:column;gap:10px">'
       +'<div class="g2">'
@@ -2062,9 +2073,10 @@ function verificarOfertasPendentes(){
     .then(function(r){ return r.ok ? r.json() : null; })
     .then(function(data){
       if (!data) return;
-      var total = (data.items || []).length;
+      var items = data.items || [];
+      var totalAtivas = items.filter(function(o){ return !prazoVencido(o.prazo); }).length;
       var badge = document.getElementById('ofertas-badge');
-      if (total > 0) { badge.textContent = total; badge.style.display='inline-block'; }
+      if (totalAtivas > 0) { badge.textContent = totalAtivas; badge.style.display='inline-block'; }
       else badge.style.display='none';
       // Atualiza o array local só se a aba não estiver aberta (para não interferir com edições em andamento)
       if (!document.getElementById('panel-ofertas').classList.contains('active')) {
