@@ -560,7 +560,7 @@ REGRAS POR EMISSÃO:
 - programa: PROGRAMA DE FIDELIDADE onde as milhas são resgatadas (ex: AAdvantage, Smiles, LATAM Pass, Azul Fidelidade), NÃO a companhia aérea. Se o conteúdo exibir explicitamente um programa, use-o com prioridade absoluta. Ex: "TudoAzul"→"Azul Fidelidade", "Avios Iberia"→"Iberia Plus". Se mostrar "AAdvantage" com voo GOL, programa="AAdvantage", cia="GOL".
 - cia: companhia aérea OPERADORA do voo (pode ser diferente do programa)
 - tipo: "nacional" ou "internacional"
-- classe: "ECONÔMICA" ou "EXECUTIVA" (só internacional; nacional deixe vazio)
+- classe: "ECONÔMICA" ou "EXECUTIVA" (só internacional; nacional deixe vazio). REGRA VISUAL CRÍTICA: quando a classe não estiver escrita explicitamente na imagem, determine pela cor predominante do design: imagens com fundo/detalhes predominantemente VERMELHOS → "EXECUTIVA"; imagens com fundo/detalhes predominantemente AZUIS → "ECONÔMICA"
 - datas_ida: TODAS as datas, agrupadas por mês em formato compacto. Ex: "Ago/26: 13, 14, 15\nSet/26: 12, 19" — use abreviação de 3 letras + /ano
 - datas_volta: idem formato compacto
 - arquivos_ida: índices (1-based) dos arquivos com datas de ida desta emissão. Ex: [1] ou [1,2]
