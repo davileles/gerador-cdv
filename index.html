@@ -393,10 +393,7 @@ var pastedFile = null, mPastedFile = null;
 var alertasData = [];
 var alertasTimer = null;
 var ofertasPendentesData = [];
-var _radarFilaEnvio = []; // fila de envios pendentes do radar
-var _radarUltimoEnvio = 0; // timestamp do último envio do radar
-var _radarFilaTimerId = null; // timer da fila do radar
-var RADAR_INTERVALO_MS = 3 * 60 * 1000; // 3 minutos entre envios do radar
+// fila do radar gerenciada pelo servidor via /ofertas/enviar → /radar/enviar
 var OFERTA_CAT_LABELS_AP = {
   transferencia:'🔄 Transferência', compra:'💰 Compra de pontos', compra_bonificada:'🛍️ Compra bonificada',
   clube:'🎫 Clube', cartao:'💳 Cartões', geral:'📰 Geral'
@@ -1734,37 +1731,6 @@ function montarMensagemRadar(o) {
   return msg;
 }
 
-// ── Fila sequencial de envio do radar (5 min entre mensagens) ──────────────
-function _radarProcessarFila() {
-  if (_radarFilaEnvio.length === 0) { _radarFilaTimerId = null; return; }
-  var agora = Date.now();
-  var decorrido = agora - _radarUltimoEnvio;
-  var espera = decorrido >= RADAR_INTERVALO_MS ? 0 : RADAR_INTERVALO_MS - decorrido;
-  _radarFilaTimerId = setTimeout(function() {
-    if (_radarFilaEnvio.length === 0) { _radarFilaTimerId = null; return; }
-    var item = _radarFilaEnvio.shift();
-    item.fn().finally(function() {
-      _radarUltimoEnvio = Date.now();
-      _radarFilaTimerId = null;
-      _radarProcessarFila();
-    });
-  }, espera);
-  // Atualizar feedback imediato da posição para itens na fila
-  _radarFilaEnvio.forEach(function(item, idx) {
-    var fbEl = document.getElementById('oferta-fb-'+item.id);
-    if (fbEl) {
-      var minTotal = Math.round((espera + idx * RADAR_INTERVALO_MS) / 60000);
-      fbEl.style.color='#f59e0b';
-      fbEl.textContent='⏳ Na fila (pos. '+(idx+2)+' — ~'+minTotal+' min)';
-    }
-  });
-}
-
-function _radarEnfileirar(id, fn) {
-  _radarFilaEnvio.push({ id: id, fn: fn });
-  if (!_radarFilaTimerId) _radarProcessarFila();
-}
-
 async function aprovarOfertaPendente(id) {
   var fb = document.getElementById('oferta-fb-'+id);
   fb.style.color='var(--muted)'; fb.textContent='Aprovando...';
@@ -1786,57 +1752,39 @@ async function aprovarOfertaPendente(id) {
       var msgEl = document.getElementById('of-msg-'+id);
       var mensagem = (msgEl && msgEl.value.trim()) ? msgEl.value : montarMensagemRadar(ofertaEditada);
 
-      // Calcula posição na fila
-      var posicao = _radarFilaEnvio.length; // 0 = próximo, 1+ = na fila
-      var agora = Date.now();
-      var decorrido = agora - _radarUltimoEnvio;
-      var espera = decorrido >= RADAR_INTERVALO_MS ? 0 : RADAR_INTERVALO_MS - decorrido;
-      var minTotal = Math.round((espera + posicao * RADAR_INTERVALO_MS) / 60000);
-
-      // Desabilitar card IMEDIATAMENTE ao aprovar — independente de quando o envio ocorrer
+      // Desabilitar card IMEDIATAMENTE ao aprovar
       var cardImediato = document.getElementById('oferta-card-'+id);
-      if (cardImediato) {
-        cardImediato.style.opacity = '.35';
-        cardImediato.style.pointerEvents = 'none';
-      }
+      if (cardImediato) { cardImediato.style.opacity = '.35'; cardImediato.style.pointerEvents = 'none'; }
+      fb.style.color='var(--muted)'; fb.textContent='Enfileirando no servidor...';
 
-      if (posicao === 0 && _radarFilaEnvio.length === 0 && (_radarUltimoEnvio === 0 || decorrido >= RADAR_INTERVALO_MS)) {
-        // Primeira aprovação ou intervalo já passou — envio imediato
-        fb.style.color='#22c55e'; fb.textContent='✓ Aprovada! Enviando...';
-      } else {
-        fb.style.color='#f59e0b'; fb.textContent='⏳ Na fila (pos. '+(posicao+1)+' — ~'+minTotal+' min)';
-      }
-
-      var cardId = id;
-      _radarEnfileirar(id, async function() {
-        var fb2 = document.getElementById('oferta-fb-'+cardId);
-        if (fb2) { fb2.style.color='var(--muted)'; fb2.textContent='Enviando...'; }
-        try {
-          var rw = await fetch(SERVER+'/enviar', {
-            method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ mensagem: mensagem, grupo: GRUPO_OFERTA })
-          });
-          var dw = await rw.json();
-          if (fb2) {
-            if (dw.ok || dw.status === 'ok') {
-              fb2.style.color='#22c55e'; fb2.textContent='✓ Enviada!';
-            } else {
-              fb2.style.color='#f97316'; fb2.textContent='✓ Aprovada (WhatsApp: '+(dw.erro||dw.error||'falha')+')';
-            }
+      // Enfileirar no servidor — o envio ocorre lá, independente de o browser estar aberto
+      try {
+        var rw = await fetch(CDV_PROXY+'/ofertas/enviar', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ id: id, mensagem: mensagem, grupo: GRUPO_OFERTA })
+        });
+        var dw = await rw.json();
+        if (dw.ok) {
+          var pos = dw.posicao || 1;
+          var min = dw.minutos || 0;
+          if (pos === 1 && min === 0) {
+            fb.style.color='#22c55e'; fb.textContent='✓ Aprovada! Enviando agora...';
+          } else {
+            fb.style.color='#f59e0b'; fb.textContent='⏳ Na fila (pos. '+pos+' — ~'+min+' min)';
           }
-        } catch(ew) {
-          if (fb2) { fb2.style.color='#f97316'; fb2.textContent='✓ Aprovada (WhatsApp offline: '+ew.message+')'; }
+        } else {
+          fb.style.color='#f97316'; fb.textContent='✓ Aprovada (fila: '+(dw.erro||'erro desconhecido')+')';
         }
-        // Remove o card da tela após 1.5s
+      } catch(ew) {
+        fb.style.color='#f97316'; fb.textContent='✓ Aprovada (servidor inacessível: '+ew.message+')';
+      }
+
+      // Remove o card da tela após 2s
+      var cardId = id;
+      setTimeout(function() {
         var card = document.getElementById('oferta-card-'+cardId);
-        if (card) {
-          setTimeout(function() {
-            card.style.transition = 'opacity .4s';
-            card.style.opacity = '0';
-            setTimeout(function() { card.remove(); }, 420);
-          }, 1500);
-        }
-      });
+        if (card) { card.style.transition='opacity .4s'; card.style.opacity='0'; setTimeout(function(){card.remove();},420); }
+      }, 2000);
 
     } else if (r.status === 404) {
       fb.style.color='#f97316'; fb.textContent='Já processada em outra sessão — removida da lista';
