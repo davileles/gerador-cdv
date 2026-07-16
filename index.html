@@ -1323,7 +1323,7 @@ async function carregarAlertas() {
 }
 
 function atualizarBadge() {
-  var pendentes = alertasData.filter(function(o){ return o.status === 'pendente' && !(o.grupoOrigem||'').startsWith('telegram:'); }).length;
+  var pendentes = alertasData.filter(function(o){ return o.status === 'pendente' && o.tipoConteudo !== 'cupom_tsp' && !(o.grupoOrigem||'').startsWith('telegram:'); }).length;
   var badge = document.getElementById('alertas-badge');
   if (pendentes > 0) { badge.textContent = pendentes; badge.style.display = 'inline-block'; }
   else { badge.style.display = 'none'; }
@@ -1338,7 +1338,7 @@ function renderAlertas(data) {
     bufferTxt.textContent = emBuffer + ' item(s) aguardando janela de 3 min...';
   } else { bufferBar.style.display = 'none'; }
 
-  var ofertas = (data.ofertas || []).filter(function(o){ return !(o.grupoOrigem||'').startsWith('telegram:'); });
+  var ofertas = (data.ofertas || []).filter(function(o){ return o.tipoConteudo !== 'cupom_tsp' && !(o.grupoOrigem||'').startsWith('telegram:'); });
   var pendentes = ofertas.filter(function(o){ return o.status === 'pendente'; });
   var processados = ofertas.filter(function(o){ return o.status !== 'pendente'; });
 
@@ -2004,12 +2004,7 @@ function verificarServidor(){
       wsConectado=d.conectado;
       document.getElementById('ws-dot').className='ws-dot '+(d.conectado?'on':'off');
       document.getElementById('ws-label').textContent=d.conectado?'WhatsApp conectado — envio automático ativo':'Servidor encontrado mas WhatsApp não conectado';
-      // atualizar badge de alertas silenciosamente
-      if (d.filaPendentes !== undefined) {
-        var badge = document.getElementById('alertas-badge');
-        if (d.filaPendentes > 0) { badge.textContent = d.filaPendentes; badge.style.display='inline-block'; }
-        else badge.style.display='none';
-      }
+      // badge de alertas atualizado por atualizarBadge() após carregarAlertas()
     })
     .catch(function(){wsConectado=false;document.getElementById('ws-dot').className='ws-dot off';document.getElementById('ws-label').textContent='Servidor desconectado.';});
 }
