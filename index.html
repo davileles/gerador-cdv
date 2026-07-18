@@ -387,6 +387,8 @@ var PROGRAMAS_LINK = {
 // que quebraria o match de "chave" no historico-transferencias.json
 var ORIGEM_TRANSFERENCIA_OPTIONS = ['Todos','BRB','BTG','C6','Caixa','Esfera','Inter','Itaú','Livelo','Nubank','Sicoob','Sicredi','XP'];
 var DESTINO_TRANSFERENCIA_OPTIONS = ['AAdvantage','ALL Accor','Azul Fidelidade','Connect Miles','Flying Blue','Hilton Honors','Iberia Plus','IHG','LATAM Pass','Smiles','TAP Miles&Go'];
+var PROGRAMA_COMPRA_BONIFICADA_OPTIONS = ['Azul Fidelidade','Banco do Brasil','Esfera','Inter','LATAM Pass','Livelo','Méliuz','PicPay','PortoPlus','Smiles'];
+var CLASSIFICACAO_LABELS = { acima_padrao:'📈 Acima do padrão', dentro_padrao:'➡️ Dentro do padrão', abaixo_padrao:'📉 Abaixo do padrão' };
 var HISTORICO_TRANSFERENCIAS_URL = 'https://davileles.github.io/painel-cdv/historico-transferencias.json';
 var historicoTransferenciasData = null;
 
@@ -1521,6 +1523,26 @@ async function rejeitarAlerta(id, salvar) {
   } catch(e) { fb.style.color='#ff585e'; fb.textContent='Erro: '+e.message; }
 }
 
+function programaCompraOptionsHtml(sel) {
+  return '<option value="">—</option>' + PROGRAMA_COMPRA_BONIFICADA_OPTIONS.map(function(v){
+    return '<option value="'+v+'"'+(v===sel?' selected':'')+'>'+v+'</option>';
+  }).join('');
+}
+
+// Monta o bloco "📊 HISTÓRICO" pra compra bonificada usando os dados já pré-calculados
+// pelo coletar.js (fonte de verdade = historico.json) — não reanalisa nada aqui.
+function blocoHistoricoCompraBonificada(o) {
+  if (o.categoria !== 'compra_bonificada' || !o.historicoComparacao) return '';
+  var h = o.historicoComparacao;
+  var linhas = [];
+  linhas.push('Pontuação atual: '+h.pontuacaoAtual+' pts/'+(h.moeda||'R$')+' (média histórica: '+h.mediaHistorica6m+' pts/'+(h.moeda||'R$')+', em '+h.amostras6m+' dias nos últimos 6 meses)');
+  linhas.push(CLASSIFICACAO_LABELS[h.classificacao] || '');
+  linhas.push('Maior pontuação em 6 meses: '+h.maximoHistorico6m+' pts/'+(h.moeda||'R$'));
+  linhas = linhas.filter(Boolean);
+  if (!linhas.length) return '';
+  return '📊 *HISTÓRICO DESSA PONTUAÇÃO*\n' + linhas.map(function(l){ return '- '+l; }).join('\n') + '\n\n';
+}
+
 // ══ HISTÓRICO DE TRANSFERÊNCIAS BONIFICADAS ══
 async function carregarHistoricoTransferencias() {
   try {
@@ -1579,11 +1601,17 @@ function destinoOptionsHtml(sel) {
 
 function toggleCamposHistorico(id) {
   var catEl = document.getElementById('of-categoria-'+id);
-  var mostrar = catEl && catEl.value === 'transferencia';
+  var cat = catEl ? catEl.value : '';
+  var mostrarTransf = cat === 'transferencia';
+  var mostrarCompra = cat === 'compra_bonificada';
   var row1 = document.getElementById('of-histrow-'+id);
   var row2 = document.getElementById('of-bonusmaxrow-'+id);
-  if (row1) row1.style.display = mostrar ? '' : 'none';
-  if (row2) row2.style.display = mostrar ? '' : 'none';
+  var row3 = document.getElementById('of-progcomprarow-'+id);
+  var row4 = document.getElementById('of-histcomprarow-'+id);
+  if (row1) row1.style.display = mostrarTransf ? '' : 'none';
+  if (row2) row2.style.display = mostrarTransf ? '' : 'none';
+  if (row3) row3.style.display = mostrarCompra ? '' : 'none';
+  if (row4) row4.style.display = mostrarCompra ? '' : 'none';
 }
 
 function formatarDataBR(iso) {
@@ -1683,6 +1711,14 @@ function renderOfertaPendenteCard(o) {
   var restricoesTxt = (o.restricoes||[]).join('\n');
   var guess = (o.categoria === 'transferencia') ? deduzirTransferencia(o) : {origem:'',destino:'',bonusMax:null};
   var mostrarHist = o.categoria === 'transferencia' ? '' : 'display:none';
+  var mostrarCompra = o.categoria === 'compra_bonificada' ? '' : 'display:none';
+  var programaCompraGuess = PROGRAMA_COMPRA_BONIFICADA_OPTIONS.indexOf(o.programa) !== -1 ? o.programa : '';
+  var h = o.historicoComparacao;
+  var historicoCompraHtml = h
+    ? '<div style="font-size:12px;line-height:1.6;color:var(--muted);background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 12px">'
+      +'📊 <strong style="color:var(--text)">Histórico (pré-calculado):</strong> '+h.pontuacaoAtual+' pts/'+(h.moeda||'R$')+' agora vs. média de '+h.mediaHistorica6m+' pts/'+(h.moeda||'R$')+' ('+h.amostras6m+' dias/6 meses) — '+(CLASSIFICACAO_LABELS[h.classificacao]||'')+'. Máximo em 6 meses: '+h.maximoHistorico6m+' pts/'+(h.moeda||'R$')
+      +'</div>'
+    : '<div style="font-size:12px;color:var(--muted2)">Sem dado histórico pré-calculado para esta oferta.</div>';
   var msgPrevia = escapeHtml(montarMensagemRadar(Object.assign({}, o, guess)));
   var vencida = prazoVencido(o.prazo);
   var cardStyle = vencida ? ' style="border-color:#7f1d1d;opacity:.75"' : '';
@@ -1706,6 +1742,8 @@ function renderOfertaPendenteCard(o) {
         +'<div class="field"><label>Destino (histórico)</label><select id="of-destino-'+o.id+'" onchange="atualizarPrevia(\''+o.id+'\')">'+destinoOptionsHtml(guess.destino)+'</select></div>'
       +'</div>'
       +'<div class="field" id="of-bonusmaxrow-'+o.id+'" style="'+mostrarHist+'"><label>Bônus máximo % (histórico)</label><input type="number" min="0" max="500" id="of-bonusmax-'+o.id+'" value="'+(guess.bonusMax!=null?guess.bonusMax:'')+'" oninput="atualizarPrevia(\''+o.id+'\')"/></div>'
+      +'<div class="field" id="of-progcomprarow-'+o.id+'" style="'+mostrarCompra+'"><label>Programa (histórico)</label><select id="of-programacompra-'+o.id+'" onchange="atualizarPrevia(\''+o.id+'\')">'+programaCompraOptionsHtml(programaCompraGuess)+'</select></div>'
+      +'<div id="of-histcomprarow-'+o.id+'" style="'+mostrarCompra+'">'+historicoCompraHtml+'</div>'
       +'<div class="g2">'
         +'<div class="field"><label>Prazo</label><input id="of-prazo-'+o.id+'" value="'+escapeAttr(o.prazo)+'" placeholder="ex: 30/06/2026 ou vazio" oninput="atualizarPrevia(\''+o.id+'\')"/></div>'
         +'<div class="field"><label>Link da oferta</label><input id="of-link-'+o.id+'" value="'+escapeAttr(o.link)+'" placeholder="https://..." oninput="atualizarPrevia(\''+o.id+'\')"/></div>'
@@ -1741,8 +1779,9 @@ function escapeAttr(s) { return escapeHtml(s).replace(/"/g, '&quot;'); }
 function atualizarPrevia(id) {
   var el = document.getElementById('of-msg-'+id);
   if (!el) return;
+  var original = ofertasPendentesData.find(function(o){ return o.id===id; }) || {};
   var edits = coletarEdicoesOferta(id);
-  el.value = montarMensagemRadar(edits);
+  el.value = montarMensagemRadar(Object.assign({}, original, edits));
 }
 
 function coletarEdicoesOferta(id) {
@@ -1765,7 +1804,8 @@ function coletarEdicoesOferta(id) {
     importante: get('importante'),
     origem: get('origem'),
     destino: get('destino'),
-    bonusMax: bonusMaxRaw !== '' ? Number(bonusMaxRaw) : null
+    bonusMax: bonusMaxRaw !== '' ? Number(bonusMaxRaw) : null,
+    programaCompra: get('programacompra')
   };
 }
 
@@ -1810,6 +1850,9 @@ function montarMensagemRadar(o) {
 
   // Histórico da transferência (compara com ofertas anteriores da mesma chave origem→destino)
   msg += blocoHistoricoTransferencia(o);
+
+  // Histórico da compra bonificada (usa dado já pré-calculado pelo coletar.js)
+  msg += blocoHistoricoCompraBonificada(o);
 
   // Custo do milheiro
   if (o.milheiro) {
