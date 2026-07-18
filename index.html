@@ -383,6 +383,13 @@ var PROGRAMAS_LINK = {
   'Aeroplan':'https://www.aircanada.com/home/ca/en/aco/flights'
 };
 
+// Listas fixas (dropdown) para o histórico de transferências bonificadas — evita erro de grafia
+// que quebraria o match de "chave" no historico-transferencias.json
+var ORIGEM_TRANSFERENCIA_OPTIONS = ['Todos','BRB','BTG','C6','Caixa','Esfera','Inter','Itaú','Livelo','Nubank','Sicoob','Sicredi','XP'];
+var DESTINO_TRANSFERENCIA_OPTIONS = ['AAdvantage','ALL Accor','Azul Fidelidade','Connect Miles','Flying Blue','Hilton Honors','Iberia Plus','IHG','LATAM Pass','Smiles','TAP Miles&Go'];
+var HISTORICO_TRANSFERENCIAS_URL = 'https://davileles.github.io/painel-cdv/historico-transferencias.json';
+var historicoTransferenciasData = null;
+
 // ══ ESTADO ══
 var currentMode = 'link';
 var currentMilhasMode = 'texto';
@@ -1514,6 +1521,117 @@ async function rejeitarAlerta(id, salvar) {
   } catch(e) { fb.style.color='#ff585e'; fb.textContent='Erro: '+e.message; }
 }
 
+// ══ HISTÓRICO DE TRANSFERÊNCIAS BONIFICADAS ══
+async function carregarHistoricoTransferencias() {
+  try {
+    var r = await fetch(HISTORICO_TRANSFERENCIAS_URL+'?t='+Date.now(), {cache:'no-cache', signal:AbortSignal.timeout(10000)});
+    if (r.ok) historicoTransferenciasData = await r.json();
+  } catch(e) { console.warn('[Histórico transferências] Falha ao carregar:', e.message); }
+}
+
+function normalizarBusca(s) {
+  return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+}
+
+function chaveHistorico(origem, destino) {
+  var norm = function(s){ return normalizarBusca(s).trim().replace(/\s+/g,'_'); };
+  return norm(origem)+'→'+norm(destino);
+}
+
+// Tenta adivinhar origem/destino/bônus máximo a partir do texto da oferta,
+// usando SOMENTE as listas fixas (evita sugerir grafia divergente). O usuário
+// sempre confirma/corrige no dropdown antes de aprovar.
+function deduzirTransferencia(o) {
+  var texto = normalizarBusca([o.titulo,o.programa,o.bonus,o.resumo].filter(Boolean).join(' '));
+  var destino = '';
+  DESTINO_TRANSFERENCIA_OPTIONS.forEach(function(d){
+    if (!destino && texto.indexOf(normalizarBusca(d)) !== -1) destino = d;
+  });
+  var gatilhosTodos = ['todos os bancos','quase todos os parceiros','bancos parceiros','todos os parceiros','bancos participantes','parceiros bancarios'];
+  var origem = '';
+  if (gatilhosTodos.some(function(g){ return texto.indexOf(g) !== -1; })) {
+    origem = 'Todos';
+  } else {
+    ORIGEM_TRANSFERENCIA_OPTIONS.forEach(function(op){
+      if (op === 'Todos' || origem) return;
+      if (op !== destino && texto.indexOf(normalizarBusca(op)) !== -1) origem = op;
+    });
+  }
+  var bonusMax = null;
+  var matches = texto.match(/(\d{1,3})\s*%/g);
+  if (matches && matches.length) {
+    var nums = matches.map(function(m){ return parseInt(m,10); }).filter(function(n){ return !isNaN(n) && n>0 && n<=500; });
+    if (nums.length) bonusMax = Math.max.apply(null, nums);
+  }
+  return { origem: origem, destino: destino, bonusMax: bonusMax };
+}
+
+function origemOptionsHtml(sel) {
+  return '<option value="">—</option>' + ORIGEM_TRANSFERENCIA_OPTIONS.map(function(v){
+    return '<option value="'+v+'"'+(v===sel?' selected':'')+'>'+v+'</option>';
+  }).join('');
+}
+function destinoOptionsHtml(sel) {
+  return '<option value="">—</option>' + DESTINO_TRANSFERENCIA_OPTIONS.map(function(v){
+    return '<option value="'+v+'"'+(v===sel?' selected':'')+'>'+v+'</option>';
+  }).join('');
+}
+
+function toggleCamposHistorico(id) {
+  var catEl = document.getElementById('of-categoria-'+id);
+  var mostrar = catEl && catEl.value === 'transferencia';
+  var row1 = document.getElementById('of-histrow-'+id);
+  var row2 = document.getElementById('of-bonusmaxrow-'+id);
+  if (row1) row1.style.display = mostrar ? '' : 'none';
+  if (row2) row2.style.display = mostrar ? '' : 'none';
+}
+
+function formatarDataBR(iso) {
+  var m = (iso||'').match(/(\d{4})-(\d{2})-(\d{2})/);
+  return m ? m[3]+'/'+m[2]+'/'+m[1] : (iso||'');
+}
+
+// Monta o bloco "📊 HISTÓRICO" pra inserir na mensagem do WhatsApp, comparando
+// a oferta atual com o histórico já registrado para a mesma chave origem→destino.
+function blocoHistoricoTransferencia(o) {
+  if (o.categoria !== 'transferencia' || !o.origem || !o.destino) return '';
+  if (!historicoTransferenciasData || !historicoTransferenciasData.items) return '';
+  var chave = chaveHistorico(o.origem, o.destino);
+  var anteriores = historicoTransferenciasData.items.filter(function(h){ return h.chave === chave; });
+  if (!anteriores.length) return '';
+
+  var atual = (o.bonusMax !== undefined && o.bonusMax !== null && o.bonusMax !== '') ? Number(o.bonusMax) : null;
+  var linhas = [];
+
+  if (anteriores.length === 1) {
+    var h0 = anteriores[0];
+    linhas.push('🔁 Já vimos essa transferência antes: '+h0.bonusMax+'% de bônus, em '+formatarDataBR(h0.dataInicio));
+  } else {
+    var media = anteriores.reduce(function(s,h){ return s+h.bonusMax; },0) / anteriores.length;
+    var mediaFmt = media.toFixed(0);
+    linhas.push(atual!=null
+      ? 'Bônus atual: '+atual+'% (média histórica: '+mediaFmt+'%, em '+anteriores.length+' ofertas)'
+      : 'Média histórica: '+mediaFmt+'% (em '+anteriores.length+' ofertas)');
+    if (atual != null) {
+      var diffPct = ((atual - media) / media) * 100;
+      if (diffPct >= 10) linhas.push('📈 Acima do padrão — '+Math.round(diffPct)+'% maior que a média');
+      else if (diffPct <= -10) linhas.push('📉 Abaixo do padrão — '+Math.round(Math.abs(diffPct))+'% menor que a média');
+      else linhas.push('➡️ Dentro do padrão histórico');
+    }
+    var datas = anteriores.map(function(h){ return new Date(h.dataInicio+'T00:00:00'); }).sort(function(a,b){ return a-b; });
+    if (datas.length >= 2) {
+      var gaps = [];
+      for (var i=1;i<datas.length;i++) gaps.push((datas[i]-datas[i-1])/86400000);
+      var mediaGap = Math.round(gaps.reduce(function(s,g){ return s+g; },0)/gaps.length);
+      var ultima = datas[datas.length-1];
+      var diasDesde = Math.round((new Date()-ultima)/86400000);
+      linhas.push('Costuma repetir a cada ~'+mediaGap+' dias — última vez há '+diasDesde+' dias ('+formatarDataBR(ultima.toISOString().slice(0,10))+')');
+    }
+  }
+
+  return '📊 *HISTÓRICO DESSA TRANSFERÊNCIA*\n' + linhas.map(function(l){ return '- '+l; }).join('\n') + '\n\n';
+}
+
 // ══ APROVAR OFERTAS (Radar) ══
 async function carregarOfertasPendentes() {
   var lista = document.getElementById('ofertas-lista');
@@ -1563,7 +1681,9 @@ function ofCatOptions(sel) {
 function renderOfertaPendenteCard(o) {
   var data = o.publicadoEm ? new Date(o.publicadoEm).toLocaleString('pt-BR') : '';
   var restricoesTxt = (o.restricoes||[]).join('\n');
-  var msgPrevia = escapeHtml(montarMensagemRadar(o));
+  var guess = (o.categoria === 'transferencia') ? deduzirTransferencia(o) : {origem:'',destino:'',bonusMax:null};
+  var mostrarHist = o.categoria === 'transferencia' ? '' : 'display:none';
+  var msgPrevia = escapeHtml(montarMensagemRadar(Object.assign({}, o, guess)));
   var vencida = prazoVencido(o.prazo);
   var cardStyle = vencida ? ' style="border-color:#7f1d1d;opacity:.75"' : '';
   var badgeEncerrada = vencida ? '<span style="background:#7f1d1d;color:#fca5a5;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.5px">&#9888;&#65039; ENCERRADA</span>' : '';
@@ -1575,12 +1695,17 @@ function renderOfertaPendenteCard(o) {
     +'<div style="padding:14px;display:flex;flex-direction:column;gap:10px">'
       +'<div class="g2">'
         +'<div class="field"><label>Título</label><input id="of-titulo-'+o.id+'" value="'+escapeAttr(o.titulo)+'" oninput="atualizarPrevia(\''+o.id+'\')"/></div>'
-        +'<div class="field"><label>Categoria</label><select id="of-categoria-'+o.id+'" onchange="atualizarPrevia(\''+o.id+'\')">'+ofCatOptions(o.categoria)+'</select></div>'
+        +'<div class="field"><label>Categoria</label><select id="of-categoria-'+o.id+'" onchange="atualizarPrevia(\''+o.id+'\'); toggleCamposHistorico(\''+o.id+'\')">'+ofCatOptions(o.categoria)+'</select></div>'
       +'</div>'
       +'<div class="g2">'
         +'<div class="field"><label>Programa</label><input id="of-programa-'+o.id+'" value="'+escapeAttr(o.programa)+'"/></div>'
         +'<div class="field"><label>Bônus / Ganho</label><input id="of-bonus-'+o.id+'" value="'+escapeAttr(o.bonus)+'"/></div>'
       +'</div>'
+      +'<div class="g2" id="of-histrow-'+o.id+'" style="'+mostrarHist+'">'
+        +'<div class="field"><label>Origem (histórico)</label><select id="of-origem-'+o.id+'" onchange="atualizarPrevia(\''+o.id+'\')">'+origemOptionsHtml(guess.origem)+'</select></div>'
+        +'<div class="field"><label>Destino (histórico)</label><select id="of-destino-'+o.id+'" onchange="atualizarPrevia(\''+o.id+'\')">'+destinoOptionsHtml(guess.destino)+'</select></div>'
+      +'</div>'
+      +'<div class="field" id="of-bonusmaxrow-'+o.id+'" style="'+mostrarHist+'"><label>Bônus máximo % (histórico)</label><input type="number" min="0" max="500" id="of-bonusmax-'+o.id+'" value="'+(guess.bonusMax!=null?guess.bonusMax:'')+'" oninput="atualizarPrevia(\''+o.id+'\')"/></div>'
       +'<div class="g2">'
         +'<div class="field"><label>Prazo</label><input id="of-prazo-'+o.id+'" value="'+escapeAttr(o.prazo)+'" placeholder="ex: 30/06/2026 ou vazio" oninput="atualizarPrevia(\''+o.id+'\')"/></div>'
         +'<div class="field"><label>Link da oferta</label><input id="of-link-'+o.id+'" value="'+escapeAttr(o.link)+'" placeholder="https://..." oninput="atualizarPrevia(\''+o.id+'\')"/></div>'
@@ -1623,6 +1748,7 @@ function atualizarPrevia(id) {
 function coletarEdicoesOferta(id) {
   var get = function(field){ var el = document.getElementById('of-'+field+'-'+id); return el ? el.value : ''; };
   var restricoes = get('restricoes').split('\n').map(function(s){return s.trim();}).filter(Boolean);
+  var bonusMaxRaw = get('bonusmax');
   return {
     titulo: get('titulo'),
     categoria: get('categoria'),
@@ -1636,7 +1762,10 @@ function coletarEdicoesOferta(id) {
     milheiro: get('milheiro'),
     tetoTransferencia: get('teto'),
     restricoes: restricoes,
-    importante: get('importante')
+    importante: get('importante'),
+    origem: get('origem'),
+    destino: get('destino'),
+    bonusMax: bonusMaxRaw !== '' ? Number(bonusMaxRaw) : null
   };
 }
 
@@ -1678,6 +1807,9 @@ function montarMensagemRadar(o) {
 
   // Resumo
   if (o.resumo) msg += stripEmojis(o.resumo) + '\n\n';
+
+  // Histórico da transferência (compara com ofertas anteriores da mesma chave origem→destino)
+  msg += blocoHistoricoTransferencia(o);
 
   // Custo do milheiro
   if (o.milheiro) {
@@ -2099,6 +2231,7 @@ async function enviarWA(msgId,statusId,fileKey) {
 
 // ══ INIT ══
 window.addEventListener('DOMContentLoaded', function() {
+  carregarHistoricoTransferencias();
   document.getElementById('tab-oferta').addEventListener('click', function(){ switchMain('oferta'); });
   document.getElementById('tab-milhas').addEventListener('click', function(){ switchMain('milhas'); });
   document.getElementById('tab-alertas').addEventListener('click', function(){ switchMain('alertas'); });
