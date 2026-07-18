@@ -385,8 +385,8 @@ var PROGRAMAS_LINK = {
 
 // Listas fixas (dropdown) para o histórico de transferências bonificadas — evita erro de grafia
 // que quebraria o match de "chave" no historico-transferencias.json
-var ORIGEM_TRANSFERENCIA_OPTIONS = ['Todos','BRB','BTG','C6','Caixa','Esfera','Inter','Itaú','Livelo','Nubank','Sicoob','Sicredi','XP'];
-var DESTINO_TRANSFERENCIA_OPTIONS = ['AAdvantage','ALL Accor','Azul Fidelidade','Connect Miles','Flying Blue','Hilton Honors','Iberia Plus','IHG','LATAM Pass','Smiles','TAP Miles&Go'];
+var ORIGEM_TRANSFERENCIA_OPTIONS = ['Todos','Azul Fidelidade','BRB','BTG','C6','Caixa','Esfera','Inter','Itaú','LATAM Pass','Livelo','Nubank','Porto Seguro','Revolut','Sicoob','Sicredi','Smiles','XP'];
+var DESTINO_TRANSFERENCIA_OPTIONS = ['AAdvantage','ALL Accor','Azul Fidelidade','Connect Miles','Flying Blue','Hilton Honors','Iberia Plus','IHG','LATAM Pass','Livelo','Smiles','TAP Miles&Go'];
 var PROGRAMA_COMPRA_BONIFICADA_OPTIONS = ['Azul Fidelidade','Banco do Brasil','Esfera','Inter','LATAM Pass','Livelo','Méliuz','PicPay','PortoPlus','Smiles'];
 var CLASSIFICACAO_LABELS = { acima_padrao:'📈 Acima do padrão', dentro_padrao:'➡️ Dentro do padrão', abaixo_padrao:'📉 Abaixo do padrão' };
 var HISTORICO_TRANSFERENCIAS_URL = 'https://davileles.github.io/painel-cdv/historico-transferencias.json';
@@ -1569,7 +1569,7 @@ function deduzirTransferencia(o) {
   DESTINO_TRANSFERENCIA_OPTIONS.forEach(function(d){
     if (!destino && texto.indexOf(normalizarBusca(d)) !== -1) destino = d;
   });
-  var gatilhosTodos = ['todos os bancos','quase todos os parceiros','bancos parceiros','todos os parceiros','bancos participantes','parceiros bancarios'];
+  var gatilhosTodos = ['todos os bancos','quase todos os parceiros','bancos parceiros','todos os parceiros','bancos participantes','parceiros bancarios','bancos selecionados'];
   var origem = '';
   if (gatilhosTodos.some(function(g){ return texto.indexOf(g) !== -1; })) {
     origem = 'Todos';
