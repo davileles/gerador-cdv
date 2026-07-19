@@ -1535,9 +1535,10 @@ function blocoHistoricoCompraBonificada(o) {
   if (o.categoria !== 'compra_bonificada' || !o.historicoComparacao) return '';
   var h = o.historicoComparacao;
   var linhas = [];
-  linhas.push('Pontuação atual: '+h.pontuacaoAtual+' pts/'+(h.moeda||'R$')+' (média histórica: '+h.mediaHistorica6m+' pts/'+(h.moeda||'R$')+', em '+h.amostras6m+' dias nos últimos 6 meses)');
+  linhas.push('Pontuação atual: '+fmtValorHistorico(h.pontuacaoAtual,h)+' (média histórica: '+fmtValorHistorico(h.mediaHistorica6m,h)+', em '+h.amostras6m+' dias nos últimos 6 meses)');
   linhas.push(CLASSIFICACAO_LABELS[h.classificacao] || '');
-  linhas.push('Maior pontuação em 6 meses: '+h.maximoHistorico6m+' pts/'+(h.moeda||'R$'));
+  linhas.push('Maior pontuação em 6 meses: '+fmtValorHistorico(h.maximoHistorico6m,h));
+  linhas.push(linhaFrequenciaAltas(h));
   linhas = linhas.filter(Boolean);
   if (!linhas.length) return '';
   return '📊 *HISTÓRICO DESSA PONTUAÇÃO*\n' + linhas.map(function(l){ return '- '+l; }).join('\n') + '\n\n';
@@ -1617,6 +1618,26 @@ function toggleCamposHistorico(id) {
 function formatarDataBR(iso) {
   var m = (iso||'').match(/(\d{4})-(\d{2})-(\d{2})/);
   return m ? m[3]+'/'+m[2]+'/'+m[1] : (iso||'');
+}
+
+function formatarDataCurtaBR(iso) {
+  var m = (iso||'').match(/(\d{4})-(\d{2})-(\d{2})/);
+  return m ? m[3]+'/'+m[2] : (iso||'');
+}
+
+// Formata um valor de pontuação/cashback de acordo com a unidade do parceiro
+// (pontos por real/dólar, ou % de cashback no caso do Shopping Inter).
+function fmtValorHistorico(valor, h) {
+  return h.moeda === '%' ? (valor+'%') : (valor+' pts/'+(h.moeda||'R$'));
+}
+
+// Monta a linha "📊 Sobe a cada ~X dias. Possível próxima alta: DD/MM",
+// igual ao que aparece no modal do parceiro na aba Comparador do painel.
+// Só existe quando o padrão de altas pôde ser calculado (parceiro tier 1
+// com histórico suficiente — ver coletar.js / coletar-inter.js).
+function linhaFrequenciaAltas(h) {
+  if (!h || !h.frequenciaDias || !h.proximaEstimadaData) return '';
+  return '📊 Sobe a cada ~'+h.frequenciaDias+' dias. Possível próxima alta: '+formatarDataCurtaBR(h.proximaEstimadaData);
 }
 
 // Monta o bloco "📊 HISTÓRICO" pra inserir na mensagem do WhatsApp, comparando
@@ -1714,9 +1735,11 @@ function renderOfertaPendenteCard(o) {
   var mostrarCompra = o.categoria === 'compra_bonificada' ? '' : 'display:none';
   var programaCompraGuess = PROGRAMA_COMPRA_BONIFICADA_OPTIONS.indexOf(o.programa) !== -1 ? o.programa : '';
   var h = o.historicoComparacao;
+  var freqLinha = h ? linhaFrequenciaAltas(h) : '';
   var historicoCompraHtml = h
     ? '<div style="font-size:12px;line-height:1.6;color:var(--muted);background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 12px">'
-      +'📊 <strong style="color:var(--text)">Histórico (pré-calculado):</strong> '+h.pontuacaoAtual+' pts/'+(h.moeda||'R$')+' agora vs. média de '+h.mediaHistorica6m+' pts/'+(h.moeda||'R$')+' ('+h.amostras6m+' dias/6 meses) — '+(CLASSIFICACAO_LABELS[h.classificacao]||'')+'. Máximo em 6 meses: '+h.maximoHistorico6m+' pts/'+(h.moeda||'R$')
+      +'📊 <strong style="color:var(--text)">Histórico (pré-calculado):</strong> '+fmtValorHistorico(h.pontuacaoAtual,h)+' agora vs. média de '+fmtValorHistorico(h.mediaHistorica6m,h)+' ('+h.amostras6m+' dias/6 meses) — '+(CLASSIFICACAO_LABELS[h.classificacao]||'')+'. Máximo em 6 meses: '+fmtValorHistorico(h.maximoHistorico6m,h)
+      +(freqLinha ? '<div style="margin-top:4px;color:#f59e0b">'+freqLinha+'</div>' : '')
       +'</div>'
     : '<div style="font-size:12px;color:var(--muted2)">Sem dado histórico pré-calculado para esta oferta.</div>';
   var msgPrevia = escapeHtml(montarMensagemRadar(Object.assign({}, o, guess)));
