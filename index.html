@@ -1535,8 +1535,6 @@ function blocoHistoricoCompraBonificada(o) {
   if (o.categoria !== 'compra_bonificada' || !o.historicoComparacao) return '';
   var h = o.historicoComparacao;
   var linhas = [];
-  linhas.push('Pontuação atual: '+fmtValorHistorico(h.pontuacaoAtual,h)+' (média histórica: '+fmtValorHistorico(h.mediaHistorica6m,h)+', em '+h.amostras6m+' dias nos últimos 6 meses)');
-  linhas.push(CLASSIFICACAO_LABELS[h.classificacao] || '');
   linhas.push('Maior pontuação em 6 meses: '+fmtValorHistorico(h.maximoHistorico6m,h));
   linhas.push(linhaFrequenciaAltas(h));
   linhas = linhas.filter(Boolean);
@@ -1637,7 +1635,7 @@ function fmtValorHistorico(valor, h) {
 // com histórico suficiente — ver coletar.js / coletar-inter.js).
 function linhaFrequenciaAltas(h) {
   if (!h || !h.frequenciaDias || !h.proximaEstimadaData) return '';
-  return '📊 Sobe a cada ~'+h.frequenciaDias+' dias. Possível próxima alta: '+formatarDataCurtaBR(h.proximaEstimadaData);
+  return 'Sobe a cada ~'+h.frequenciaDias+' dias. Possível próxima alta: '+formatarDataCurtaBR(h.proximaEstimadaData);
 }
 
 // Monta o bloco "📊 HISTÓRICO" pra inserir na mensagem do WhatsApp, comparando
