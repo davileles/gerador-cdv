@@ -1529,19 +1529,6 @@ function programaCompraOptionsHtml(sel) {
   }).join('');
 }
 
-// Monta o bloco "📊 HISTÓRICO" pra compra bonificada usando os dados já pré-calculados
-// pelo coletar.js (fonte de verdade = historico.json) — não reanalisa nada aqui.
-function blocoHistoricoCompraBonificada(o) {
-  if (o.categoria !== 'compra_bonificada' || !o.historicoComparacao) return '';
-  var h = o.historicoComparacao;
-  var linhas = [];
-  linhas.push('Maior pontuação em 6 meses: '+fmtValorHistorico(h.maximoHistorico6m,h));
-  linhas.push(linhaFrequenciaAltas(h));
-  linhas = linhas.filter(Boolean);
-  if (!linhas.length) return '';
-  return '📊 *HISTÓRICO DESSA PONTUAÇÃO*\n' + linhas.map(function(l){ return '- '+l; }).join('\n') + '\n\n';
-}
-
 // ══ HISTÓRICO DE TRANSFERÊNCIAS BONIFICADAS ══
 async function carregarHistoricoTransferencias() {
   try {
@@ -1871,9 +1858,6 @@ function montarMensagemRadar(o) {
 
   // Histórico da transferência (compara com ofertas anteriores da mesma chave origem→destino)
   msg += blocoHistoricoTransferencia(o);
-
-  // Histórico da compra bonificada (usa dado já pré-calculado pelo coletar.js)
-  msg += blocoHistoricoCompraBonificada(o);
 
   // Custo do milheiro
   if (o.milheiro) {
