@@ -404,8 +404,8 @@ var alertasTimer = null;
 var ofertasPendentesData = [];
 // fila do radar gerenciada pelo servidor via /ofertas/enviar → /radar/enviar
 var OFERTA_CAT_LABELS_AP = {
-  transferencia:'🔄 Transferência', compra:'💰 Compra de pontos', compra_bonificada:'🛍️ Compra bonificada',
-  clube:'🎫 Clube', cartao:'💳 Cartões', geral:'📰 Geral'
+  cartao:'💳 Cartões', clube:'🎫 Clube', compra_bonificada:'🛍️ Compra bonificada',
+  compra:'💰 Compra de pontos', geral:'📰 Geral', transferencia:'🔄 Transferência'
 };
 
 // ══ LOGO ══
@@ -1026,7 +1026,7 @@ function renderEmissoes() {
 function buildEmissaoFormHTML(obj, idx) {
   var id = 'm-em-' + idx;
   var programaOptions = '';
-  var programas = ['Smiles','Azul Fidelidade','Azul pelo Mundo','LATAM Pass','Iberia Plus','Privilege Club','Executive Club','TAP','AAdvantage','SUMA','Flying Club','Finnair Plus','Aeroplan'];
+  var programas = ['AAdvantage','Aeroplan','Azul Fidelidade','Azul pelo Mundo','Executive Club','Finnair Plus','Flying Club','Iberia Plus','LATAM Pass','Privilege Club','Smiles','SUMA','TAP'];
   programas.forEach(function(p) { programaOptions += '<option value="'+p+'"'+(obj.programa===p?' selected':'')+'>'+p+'</option>'; });
   var isIntl = obj.tipo === 'internacional';
   return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
