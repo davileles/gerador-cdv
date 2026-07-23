@@ -1546,34 +1546,118 @@ function chaveHistorico(origem, destino) {
   return norm(origem)+'→'+norm(destino);
 }
 
-// Tenta adivinhar origem/destino/bônus máximo a partir do texto da oferta,
-// usando SOMENTE as listas fixas (evita sugerir grafia divergente). O usuário
-// sempre confirma/corrige no dropdown antes de aprovar.
-function deduzirTransferencia(o) {
-  var texto = normalizarBusca([o.titulo,o.programa,o.bonus,o.resumo].filter(Boolean).join(' '));
-  var destino = '';
-  DESTINO_TRANSFERENCIA_OPTIONS.forEach(function(d){
-    if (!destino && texto.indexOf(normalizarBusca(d)) !== -1) destino = d;
+// Apelidos de grafia: o texto das ofertas raramente usa o nome canonico da
+// lista ("Pontos Azul", "ConnectMiles", "C6 Bank"). Sem isso o match falha e a
+// deducao cai em um programa errado citado de passagem.
+var ALIAS_PROGRAMAS = {
+  'Azul Fidelidade': ['azul fidelidade','pontos azul','azul'],
+  'LATAM Pass': ['latam pass','latam'],
+  'ALL Accor': ['all accor','accor'],
+  'Connect Miles': ['connect miles','connectmiles'],
+  'TAP Miles&Go': ['tap miles&go','tap miles e go','miles&go'],
+  'Iberia Plus': ['iberia plus','iberia'],
+  'Hilton Honors': ['hilton honors','hilton'],
+  'Porto Seguro': ['porto seguro','porto bank','porto'],
+  'C6': ['c6 bank','c6'],
+  'BTG': ['btg pactual','btg'],
+  'Inter': ['banco inter','inter'],
+  'AAdvantage': ['aadvantage','advantage']
+};
+function aliasesDe(op) { return ALIAS_PROGRAMAS[op] || [normalizarBusca(op)]; }
+function escRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+// Posicao do match mais a esquerda de um programa (com bordas de palavra, para
+// "inter" nao casar dentro de "internacional"). Infinity = nao encontrado.
+function posPrograma(txt, op) {
+  var pos = Infinity;
+  aliasesDe(op).forEach(function(a){
+    var m = new RegExp('(^|[^a-z0-9])' + escRegex(a) + '($|[^a-z0-9])').exec(txt);
+    if (m) { var i = m.index + m[1].length; if (i < pos) pos = i; }
   });
-  var gatilhosTodos = ['todos os bancos','quase todos os parceiros','bancos parceiros','todos os parceiros','bancos participantes','parceiros bancarios','bancos selecionados'];
+  return pos;
+}
+
+// Programa da lista que aparece mais a ESQUERDA no texto — nao o primeiro da lista.
+function matchPosicional(txt, opcoes, excluir) {
+  var melhor = '', pos = Infinity;
+  (opcoes || []).forEach(function(op){
+    if (!op || op === 'Todos' || op === excluir) return;
+    var i = posPrograma(txt, op);
+    if (i < pos) { pos = i; melhor = op; }
+  });
+  return melhor;
+}
+
+// Ultimo programa citado logo apos uma preposicao de destino ("para X", "-> X").
+// "Ultimo" porque em encadeamentos (A -> B -> C) o destino final e o que vale.
+function destinoPorPreposicao(txt) {
+  var melhor = '', pos = -1;
+  DESTINO_TRANSFERENCIA_OPTIONS.forEach(function(d){
+    aliasesDe(d).forEach(function(a){
+      var re = new RegExp('(?:para|rumo a|->|\u2192|em direcao a)\\s*(?:o|a|os|as)?\\s*' + escRegex(a) + '($|[^a-z0-9])', 'g');
+      var m;
+      while ((m = re.exec(txt)) !== null) { if (m.index > pos) { pos = m.index; melhor = d; } }
+    });
+  });
+  return melhor;
+}
+
+// Tenta adivinhar origem/destino/bonus maximo a partir do texto da oferta,
+// usando SOMENTE as listas fixas (evita sugerir grafia divergente). O usuario
+// sempre confirma/corrige no dropdown antes de aprovar.
+//
+// 2026-07-23: o destino passou a ser buscado por camada de autoridade
+// (preposicao no titulo > campo programa > titulo > resumo) em vez de pela
+// ordem da lista. A busca antiga fazia "...pontos para Smiles ... como Livelo
+// e Esfera" cair em Livelo, porque 'Livelo' vem antes de 'Smiles' na lista
+// (oferta 1f1yp3f). O bonusMax deixou de varrer o resumo inteiro, que costuma
+// citar percentuais de cupom/desconto que nao sao o bonus da transferencia.
+function deduzirTransferencia(o) {
+  var titulo   = normalizarBusca(o.titulo || '');
+  var programa = normalizarBusca(o.programa || '');
+  var corpo    = normalizarBusca([o.bonus, o.resumo].filter(Boolean).join(' '));
+  var texto    = [titulo, programa, corpo].join(' ');
+  var link     = (o.link || '').toLowerCase();
+
+  // Combo: titulo encadeia mais de uma perna (ex: "Esfera -> Azul -> ALL Accor").
+  // Os percentuais pertencem a campanhas diferentes, entao nao da para deduzir
+  // um bonusMax unico — marca para revisao manual e sugere nao registrar.
+  var setas = (titulo.match(/\u2192|->/g) || []).length;
+  var combo = setas >= 2 || /(^|[^a-z])combo([^a-z]|$)/.test(titulo);
+
+  var destino = destinoPorPreposicao(titulo)
+             || matchPosicional(programa, DESTINO_TRANSFERENCIA_OPTIONS)
+             || matchPosicional(titulo, DESTINO_TRANSFERENCIA_OPTIONS)
+             || destinoPorPreposicao(corpo)
+             || matchPosicional(corpo, DESTINO_TRANSFERENCIA_OPTIONS);
+
+  var gatilhosTodos = ['todos os bancos','quase todos os parceiros','bancos parceiros',
+    'todos os parceiros','bancos participantes','parceiros bancarios','bancos selecionados',
+    'cartoes de credito e programas','bancos e programas','diversos bancos','principais bancos',
+    'varios parceiros','diversos parceiros'];
   var origem = '';
   if (gatilhosTodos.some(function(g){ return texto.indexOf(g) !== -1; })) {
     origem = 'Todos';
   } else {
-    ORIGEM_TRANSFERENCIA_OPTIONS.forEach(function(op){
-      if (op === 'Todos' || origem) return;
-      if (op !== destino && texto.indexOf(normalizarBusca(op)) !== -1) origem = op;
-    });
+    origem = matchPosicional(titulo, ORIGEM_TRANSFERENCIA_OPTIONS, destino)
+          || matchPosicional(programa, ORIGEM_TRANSFERENCIA_OPTIONS, destino)
+          || matchPosicional(corpo, ORIGEM_TRANSFERENCIA_OPTIONS, destino);
+    // Slug "bancos-" da Smiles indica campanha ampla — so vale se nenhum banco
+    // especifico foi citado, senao rotula errado campanha de banco unico.
+    if (!origem && link.indexOf('/bancos-') !== -1) origem = 'Todos';
   }
-  var bonusMax = null;
-  var matches = texto.match(/(\d{1,3})\s*%/g);
-  if (matches && matches.length) {
-    var nums = matches.map(function(m){ return parseInt(m,10); }).filter(function(n){ return !isNaN(n) && n>0 && n<=500; });
-    if (nums.length) bonusMax = Math.max.apply(null, nums);
-  }
-  return { origem: origem, destino: destino, bonusMax: bonusMax };
-}
 
+  var bonusMax = null;
+  if (!combo) {
+    var fonte = normalizarBusca([o.titulo, o.bonus].filter(Boolean).join(' '));
+    var matches = fonte.match(/(\d{1,3})\s*%/g);
+    if (matches && matches.length) {
+      var nums = matches.map(function(m){ return parseInt(m,10); }).filter(function(n){ return !isNaN(n) && n>0 && n<=500; });
+      if (nums.length) bonusMax = Math.max.apply(null, nums);
+    }
+  }
+  return { origem: origem, destino: destino, bonusMax: bonusMax, combo: combo };
+}
 function origemOptionsHtml(sel) {
   return '<option value="">—</option>' + ORIGEM_TRANSFERENCIA_OPTIONS.map(function(v){
     return '<option value="'+v+'"'+(v===sel?' selected':'')+'>'+v+'</option>';
@@ -1594,8 +1678,10 @@ function toggleCamposHistorico(id) {
   var row2 = document.getElementById('of-bonusmaxrow-'+id);
   var row3 = document.getElementById('of-progcomprarow-'+id);
   var row4 = document.getElementById('of-histcomprarow-'+id);
+  var row5 = document.getElementById('of-semhistrow-'+id);
   if (row1) row1.style.display = mostrarTransf ? '' : 'none';
   if (row2) row2.style.display = mostrarTransf ? '' : 'none';
+  if (row5) row5.style.display = mostrarTransf ? '' : 'none';
   if (row3) row3.style.display = mostrarCompra ? '' : 'none';
   if (row4) row4.style.display = mostrarCompra ? '' : 'none';
 }
@@ -1715,7 +1801,7 @@ function ofCatOptions(sel) {
 function renderOfertaPendenteCard(o) {
   var data = o.publicadoEm ? new Date(o.publicadoEm).toLocaleString('pt-BR') : '';
   var restricoesTxt = (o.restricoes||[]).join('\n');
-  var guess = (o.categoria === 'transferencia') ? deduzirTransferencia(o) : {origem:'',destino:'',bonusMax:null};
+  var guess = (o.categoria === 'transferencia') ? deduzirTransferencia(o) : {origem:'',destino:'',bonusMax:null,combo:false};
   var mostrarHist = o.categoria === 'transferencia' ? '' : 'display:none';
   var mostrarCompra = o.categoria === 'compra_bonificada' ? '' : 'display:none';
   var programaCompraGuess = PROGRAMA_COMPRA_BONIFICADA_OPTIONS.indexOf(o.programa) !== -1 ? o.programa : '';
@@ -1750,6 +1836,10 @@ function renderOfertaPendenteCard(o) {
         +'<div class="field"><label>Destino (histórico)</label><select id="of-destino-'+o.id+'" onchange="atualizarPrevia(\''+o.id+'\')">'+destinoOptionsHtml(guess.destino)+'</select></div>'
       +'</div>'
       +'<div class="field" id="of-bonusmaxrow-'+o.id+'" style="'+mostrarHist+'"><label>Bônus máximo % (histórico)</label><input type="number" min="0" max="500" id="of-bonusmax-'+o.id+'" value="'+(guess.bonusMax!=null?guess.bonusMax:'')+'" oninput="atualizarPrevia(\''+o.id+'\')"/></div>'
+      +'<div class="field" id="of-semhistrow-'+o.id+'" style="'+mostrarHist+'">'
+        +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0"><input type="checkbox" id="of-semhist-'+o.id+'"'+(guess.combo?' checked':'')+' style="width:auto;margin:0"/> Não registrar no histórico de transferências (oferta combo ou derivada de campanhas já registradas)</label>'
+        +(guess.combo?'<div style="font-size:11px;color:#f59e0b;margin-top:6px;line-height:1.5">⚠️ Combo detectado: os percentuais do título pertencem a pernas diferentes. O bônus máximo não foi deduzido — preencha manualmente só se for registrar.</div>':'')
+      +'</div>'
       +'<div class="field" id="of-progcomprarow-'+o.id+'" style="'+mostrarCompra+'"><label>Programa (histórico)</label><select id="of-programacompra-'+o.id+'" onchange="atualizarPrevia(\''+o.id+'\')">'+programaCompraOptionsHtml(programaCompraGuess)+'</select></div>'
       +'<div id="of-histcomprarow-'+o.id+'" style="'+mostrarCompra+'">'+historicoCompraHtml+'</div>'
       +'<div class="g2">'
@@ -1796,7 +1886,9 @@ function coletarEdicoesOferta(id) {
   var get = function(field){ var el = document.getElementById('of-'+field+'-'+id); return el ? el.value : ''; };
   var restricoes = get('restricoes').split('\n').map(function(s){return s.trim();}).filter(Boolean);
   var bonusMaxRaw = get('bonusmax');
+  var semHistEl = document.getElementById('of-semhist-'+id);
   return {
+    semHistorico: !!(semHistEl && semHistEl.checked),
     titulo: get('titulo'),
     categoria: get('categoria'),
     programa: get('programa'),
