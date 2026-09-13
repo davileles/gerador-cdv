@@ -3298,7 +3298,7 @@ function renderOfertaPendenteCard(o) {
   return '<div class="alerta-card" id="oferta-card-'+o.id+'"'+cardStyle+'>'
     +'<div class="alerta-header">'
     +'<span class="alerta-id">'+(o.emoji||'📰')+'</span>'
-    +'<span class="alerta-rota">'+escapeHtml(o.titulo||'')+'</span>'    +badgeEncerrada    +'<span class="alerta-time">'+data+'</span>'
+    +'<span class="alerta-rota">'+escapeHtml(o.titulo||'')+'</span>'    +badgeEncerrada    +badgeOrigemOferta(o)    +'<span class="alerta-time">'+data+'</span>'
     +'</div>'
     +'<div style="padding:14px;display:flex;flex-direction:column;gap:10px">'
       +'<div class="g2">'
@@ -3337,6 +3337,7 @@ function renderOfertaPendenteCard(o) {
       +'<div class="field"><label>Teto de bônus (transferência)</label><textarea id="of-teto-'+o.id+'" style="min-height:50px" oninput="atualizarPrevia(\''+o.id+'\')">'+escapeHtml(o.tetoTransferencia)+'</textarea></div>'
       +'<div class="field"><label>Restrições / condições (uma por linha)</label><textarea id="of-restricoes-'+o.id+'" style="min-height:110px" oninput="atualizarPrevia(\''+o.id+'\')">'+escapeHtml(restricoesTxt)+'</textarea></div>'
       +'<div class="field"><label>Texto "Importante" (compra bonificada)</label><textarea id="of-importante-'+o.id+'" style="min-height:60px" oninput="atualizarPrevia(\''+o.id+'\')">'+escapeHtml(o.importante)+'</textarea></div>'
+      +blocoOriginalOferta(o)
       // ── Preview da mensagem WhatsApp ──
       +'<div style="border-top:1px solid var(--border2);margin-top:4px;padding-top:12px">'
         +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
@@ -3353,6 +3354,28 @@ function renderOfertaPendenteCard(o) {
     +'<span class="alerta-fb" id="oferta-fb-'+o.id+'"></span>'
     +'</div>'
     +'</div>';
+}
+
+// Oferta capturada em grupo de WhatsApp nao teve artigo por tras: nao ha texto
+// longo, regulamento nem "informacoes importantes" para a IA ter lido. Marcar a
+// procedencia no card e o que permite revisar essa com mais desconfianca do que
+// a que veio do radar — principalmente teto de bonus e prazo.
+function badgeOrigemOferta(o) {
+  if (o.fonte !== 'whatsapp') return '';
+  var titulo = o.grupoNome ? 'Capturada no grupo: ' + o.grupoNome : 'Capturada em grupo de WhatsApp';
+  return '<span title="' + escapeAttr(titulo) + '" style="background:#064e3b;color:#6ee7b7;font-size:10px;'
+       + 'font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.5px">&#128241; WHATSAPP'
+       + (o.grupoNome ? ' · ' + escapeHtml(o.grupoNome) : '') + '</span>';
+}
+
+function blocoOriginalOferta(o) {
+  if (!o.conteudoOriginal) return '';
+  return '<details style="font-size:12px;color:var(--muted)">'
+    + '<summary style="cursor:pointer;color:var(--accent);font-size:11px;font-weight:700;'
+    + 'text-transform:uppercase;letter-spacing:.5px">Mensagem original do grupo</summary>'
+    + '<pre style="white-space:pre-wrap;margin:8px 0 0;padding:10px;background:var(--surface2);'
+    + 'border:1px solid var(--border2);border-radius:8px;font-size:12px;line-height:1.5">'
+    + escapeHtml(o.conteudoOriginal) + '</pre></details>';
 }
 
 function escapeAttr(s) { return escapeHtml(s).replace(/"/g, '&quot;'); }
@@ -4784,8 +4807,12 @@ function cfgRenderMonitorados() {
   if (!lista.length) {
     alvo.innerHTML = '<p class="cfg-ajuda">Nenhum grupo cadastrado — o radar de milhas não está capturando nada.</p>';
   } else {
-    var ativos = lista.filter(function(m){ return m.ativo !== false; }).length;
-    var html = '<p class="cfg-ajuda">' + ativos + ' de ' + lista.length + ' ligado(s).</p>';
+    var ligados = lista.filter(function(m){ return m.ativo !== false; });
+    var deOferta = ligados.filter(function(m){ return m.tipo === 'oferta'; }).length;
+    var html = '<p class="cfg-ajuda">' + ligados.length + ' de ' + lista.length + ' ligado(s) — '
+             + (ligados.length - deOferta) + ' de emissões, ' + deOferta + ' de ofertas.<br>'
+             + 'Grupo de <b>Emissões</b> vai para a fila de alertas de passagem. Grupo de <b>Ofertas</b> '
+             + 'vai para a aba Aprovar Ofertas, junto com o que o radar coleta.</p>';
     lista.forEach(function(m, i) {
       var on = m.ativo !== false;
       html += '<div class="cfg-linha' + (on ? '' : ' off') + '">'
@@ -4794,6 +4821,10 @@ function cfgRenderMonitorados() {
             +   '<div class="cfg-nome">' + cfgEsc(cfgNomeDe(m.jid, m.nome)) + '</div>'
             +   '<div class="cfg-jid">' + cfgEsc(m.jid) + '</div>'
             + '</div>'
+            + '<select onchange="cfgTipoMonitorado(' + i + ',this.value)" title="O que este grupo publica: alerta de passagem (vai para a fila de Emissoes) ou promocao de pontos (vai para Aprovar Ofertas)" style="font-size:11px;padding:4px 6px;max-width:130px">'
+            +   '<option value="emissao"' + (m.tipo === 'oferta' ? '' : ' selected') + '>✈️ Emissões</option>'
+            +   '<option value="oferta"'  + (m.tipo === 'oferta' ? ' selected' : '') + '>📡 Ofertas</option>'
+            + '</select>'
             + '<button class="camp-mini" style="color:#ff9a9d" onclick="cfgRemoverMonitorado(' + i + ')" title="Remover do cadastro">🗑️</button>'
             + '</div>';
     });
@@ -4864,6 +4895,12 @@ function cfgToggleMonitorado(i, on) {
   cfgSujo();
 }
 
+function cfgTipoMonitorado(i, tipo) {
+  CFG_CDV.monitorados[i].tipo = (tipo === 'oferta') ? 'oferta' : 'emissao';
+  cfgRenderMonitorados();
+  cfgSujo();
+}
+
 function cfgRemoverMonitorado(i) {
   var m = CFG_CDV.monitorados[i];
   if (!confirm('Remover "' + cfgNomeDe(m.jid, m.nome) + '" do cadastro?\n\nPara apenas parar de capturar, desmarque a caixa: o cadastro fica e dá para religar depois.')) return;
@@ -4884,7 +4921,7 @@ function cfgAddMonitorado() {
   escolhidos.forEach(function(jid){
     if (jaTem[jid]) return;
     jaTem[jid] = 1;
-    CFG_CDV.monitorados.push({ jid: jid, nome: CFG_NOMES[jid] || '', ativo: true });
+    CFG_CDV.monitorados.push({ jid: jid, nome: CFG_NOMES[jid] || '', ativo: true, tipo: 'emissao' });
     novos++;
   });
   cfgRenderMonitorados();
