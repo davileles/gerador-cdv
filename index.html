@@ -314,6 +314,7 @@ body[data-tema="light"] textarea.out{color:var(--text)}
   <button class="main-tab" id="tab-enviadas">✅ Enviadas hoje</button>
   <button class="main-tab" id="tab-ofertas">📡 Aprovar Ofertas<span class="alerta-badge" id="ofertas-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-campanha">📣 Campanha</button>
+  <button class="main-tab" id="tab-entrada">👥 Reentrada</button>
   <button class="main-tab" id="tab-config">⚙️ Config</button>
 </div>
 
@@ -742,6 +743,43 @@ body[data-tema="light"] textarea.out{color:var(--text)}
 </div>
 
 <!-- ══ PAINEL CONFIG ══ -->
+<!-- ══ PAINEL REENTRADA ══ -->
+<div class="main-panel" id="panel-entrada">
+  <div class="card">
+    <p class="badge-hint">👥 Recolocar ex-aluno nos grupos</p>
+    <p class="cfg-ajuda">
+      Quem foi <b>removido</b> de um grupo não volta pelo link de convite — o WhatsApp bloqueia a entrada
+      de quem um admin tirou. Só volta se um admin <b>adicionar</b>. Aqui os números conectados fazem isso
+      nos grupos onde são admin, um de cada vez, com pausa entre eles.
+    </p>
+
+    <div class="field" style="margin-bottom:10px">
+      <label>Telefone <span style="color:var(--muted2);font-weight:400">— com DDI e DDD</span></label>
+      <input type="text" id="re-tel" placeholder="55 31 99999-8888" autocomplete="off"/>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="camp-mini" style="padding:10px 14px" onclick="reCarregar(true)">🔍 Ver situação</button>
+      <button class="camp-mini" style="padding:10px 14px" onclick="reMarcar(true)">Marcar todos</button>
+      <button class="camp-mini" style="padding:10px 14px" onclick="reMarcar(false)">Desmarcar</button>
+    </div>
+    <div id="re-estado" style="font-size:12.5px;color:var(--muted);margin:10px 0">Carregando grupos de reentrada…</div>
+    <div id="re-grupos"></div>
+
+    <label style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--muted);margin-top:12px">
+      <input type="checkbox" id="re-avisar" checked style="margin-top:2px"/>
+      <span>Mandar no privado da pessoa os links dos grupos em que o WhatsApp não deixou adicionar direto.</span>
+    </label>
+
+    <button class="btn btn-blue" style="margin-top:14px" onclick="reAdicionar()">➕ Adicionar aos grupos marcados</button>
+    <div id="re-fb" style="font-size:12.5px;margin-top:10px;text-align:center"></div>
+    <div id="re-resultado" style="margin-top:12px"></div>
+
+    <p class="cfg-ajuda" style="margin-top:14px">
+      A lista de grupos é a cadastrada em <b>Config → Grupos de reentrada</b>.
+    </p>
+  </div>
+</div>
+
 <div class="main-panel" id="panel-config">
   <div class="card">
     <p class="badge-hint">⚙️ Operação CDV</p>
@@ -780,6 +818,23 @@ body[data-tema="light"] textarea.out{color:var(--text)}
         <button class="camp-mini" style="padding:10px 14px" onclick="cfgAddMonitorado()">+ Adicionar selecionados</button>
         <button class="camp-mini" style="padding:10px 14px" onclick="cfgMonSelTodos()">Selecionar todos os filtrados</button>
         <span id="cfg-mon-sel" style="font-size:12px;color:var(--muted2)"></span>
+      </div>
+
+      <div class="camp-sec">Grupos de reentrada</div>
+      <p class="cfg-ajuda">
+        Onde o ex-aluno é recolocado pela aba <b>Reentrada</b>. Lista separada dos destinos e dos monitorados de
+        propósito: desligar um grupo no radar não pode tirá-lo da reentrada. Desmarcar é reversível — o cadastro fica.
+      </p>
+      <div id="cfg-entrada"></div>
+      <div class="field" style="margin-top:10px">
+        <label>Adicionar grupos <span style="color:var(--muted2);font-weight:400">— Ctrl/Cmd ou Shift para escolher vários</span></label>
+        <input id="cfg-ent-busca" type="text" placeholder="Filtrar por nome ou JID…" oninput="cfgRenderEntNovo()" style="margin-bottom:6px"/>
+        <select id="cfg-ent-novo" multiple size="8" onchange="cfgEntSelInfo()"></select>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+        <button class="camp-mini" style="padding:10px 14px" onclick="cfgAddEntrada()">+ Adicionar selecionados</button>
+        <button class="camp-mini" style="padding:10px 14px" onclick="cfgEntSelTodos()">Selecionar todos os filtrados</button>
+        <span id="cfg-ent-sel" style="font-size:12px;color:var(--muted2)"></span>
       </div>
 
       <div class="camp-sec">Administradores</div>
@@ -1006,7 +1061,7 @@ document.getElementById('logo-img').src = "data:image/png;base64,/9j/4AAQSkZJRgA
 
 // ══ TABS ══
 function switchMain(name) {
-  ['oferta','milhas','alertas','enviadas','ofertas','campanha','config'].forEach(function(id) {
+  ['oferta','milhas','alertas','enviadas','ofertas','campanha','entrada','config'].forEach(function(id) {
     document.getElementById('tab-'+id).classList.toggle('active', id===name);
     document.getElementById('panel-'+id).classList.toggle('active', id===name);
   });
@@ -1014,6 +1069,7 @@ function switchMain(name) {
   if (name === 'enviadas') carregarEnviadasHoje();
   if (name === 'ofertas') carregarOfertasPendentes();
   if (name === 'campanha') campAoAbrir();
+  if (name === 'entrada') reAoAbrir();
   if (name === 'config') cfgCarregar();
 }
 
@@ -4767,6 +4823,7 @@ async function cfgCarregar() {
 function cfgRender() {
   cfgRenderSelectsGrupo();
   cfgRenderMonitorados();
+  cfgRenderEntrada();
   cfgRenderAdmins();
   cfgRenderContas();
   cfgRenderLeitores();
@@ -4927,6 +4984,118 @@ function cfgAddMonitorado() {
   cfgRenderMonitorados();
   cfgMonSelInfo(novos ? novos + ' grupo(s) adicionado(s) — falta Salvar.' : 'Nenhum grupo novo: já estavam na lista.');
   if (novos) cfgSujo();
+}
+
+// ══ CONFIG: GRUPOS DE REENTRADA ══
+// Mesma mecanica dos monitorados: cadastro com liga/desliga e um seletor
+// multiplo filtravel para adicionar. Servidor antigo (sem a secao) devolve
+// config sem `entrada` — sem este default a tela quebraria no primeiro render.
+function cfgRenderEntrada() {
+  if (!Array.isArray(CFG_CDV.entrada)) CFG_CDV.entrada = [];
+  var lista = CFG_CDV.entrada;
+  var alvo = document.getElementById('cfg-entrada');
+  if (!alvo) return;
+  if (!lista.length) {
+    alvo.innerHTML = '<p class="cfg-ajuda">Nenhum grupo cadastrado — a aba Reentrada não tem onde colocar ninguém.</p>';
+  } else {
+    var ligados = lista.filter(function(g){ return g.ativo !== false; });
+    var html = '<p class="cfg-ajuda">' + ligados.length + ' de ' + lista.length + ' ligado(s).</p>';
+    lista.forEach(function(g, i) {
+      var on = g.ativo !== false;
+      html += '<div class="cfg-linha' + (on ? '' : ' off') + '">'
+            + '<input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="cfgToggleEntrada(' + i + ',this.checked)"/>'
+            + '<div style="flex:1;min-width:0">'
+            +   '<div class="cfg-nome">' + cfgEsc(cfgNomeDe(g.jid, g.nome)) + '</div>'
+            +   '<div class="cfg-jid">' + cfgEsc(g.jid) + '</div>'
+            + '</div>'
+            + '<button class="camp-mini" style="color:#ff9a9d" onclick="cfgRemoverEntrada(' + i + ')" title="Remover do cadastro">🗑️</button>'
+            + '</div>';
+    });
+    alvo.innerHTML = html;
+  }
+  cfgRenderEntNovo();
+}
+
+function cfgRenderEntNovo() {
+  var sel = document.getElementById('cfg-ent-novo');
+  if (!sel) return;
+  var jaTem = {};
+  (CFG_CDV.entrada || []).forEach(function(g){ jaTem[g.jid] = 1; });
+  var termo = ((document.getElementById('cfg-ent-busca') || {}).value || '').trim().toLowerCase();
+  var opcoes = Object.keys(CFG_NOMES)
+    .filter(function(jid){ return !jaTem[jid]; })
+    .map(function(jid){ return { jid: jid, nome: CFG_NOMES[jid] || jid }; })
+    .filter(function(o){
+      if (!termo) return true;
+      return o.nome.toLowerCase().indexOf(termo) >= 0 || o.jid.toLowerCase().indexOf(termo) >= 0;
+    })
+    .sort(function(a,b){ return a.nome.localeCompare(b.nome, 'pt-BR'); });
+  if (!opcoes.length) {
+    sel.innerHTML = '<option value="" disabled>'
+      + (termo ? '— nenhum grupo com \u201C' + cfgEsc(termo) + '\u201D —'
+               : '— todos os grupos conhecidos já estão na lista —')
+      + '</option>';
+  } else {
+    sel.innerHTML = opcoes.map(function(o){
+      return '<option value="' + cfgEsc(o.jid) + '" title="' + cfgEsc(o.jid) + '">' + cfgEsc(o.nome) + '</option>';
+    }).join('');
+  }
+  cfgEntSelInfo();
+}
+
+function cfgEntSelecionados() {
+  var sel = document.getElementById('cfg-ent-novo');
+  if (!sel) return [];
+  return Array.prototype.slice.call(sel.selectedOptions || [])
+    .map(function(o){ return o.value; })
+    .filter(function(v){ return !!v; });
+}
+
+function cfgEntSelInfo(msg) {
+  var alvo = document.getElementById('cfg-ent-sel');
+  if (!alvo) return;
+  if (msg) { alvo.textContent = msg; return; }
+  var n = cfgEntSelecionados().length;
+  alvo.textContent = n ? n + ' selecionado(s)' : '';
+}
+
+function cfgEntSelTodos() {
+  var sel = document.getElementById('cfg-ent-novo');
+  if (!sel) return;
+  Array.prototype.slice.call(sel.options).forEach(function(o){ if (o.value) o.selected = true; });
+  cfgEntSelInfo();
+}
+
+function cfgAddEntrada() {
+  var escolhidos = cfgEntSelecionados();
+  if (!escolhidos.length) { cfgEntSelInfo('Escolha ao menos um grupo na lista acima.'); return; }
+  if (!Array.isArray(CFG_CDV.entrada)) CFG_CDV.entrada = [];
+  var jaTem = {};
+  CFG_CDV.entrada.forEach(function(g){ jaTem[g.jid] = 1; });
+  var novos = 0;
+  escolhidos.forEach(function(jid){
+    if (jaTem[jid]) return;
+    jaTem[jid] = 1;
+    CFG_CDV.entrada.push({ jid: jid, nome: CFG_NOMES[jid] || '', ativo: true });
+    novos++;
+  });
+  cfgRenderEntrada();
+  cfgEntSelInfo(novos ? novos + ' grupo(s) adicionado(s) — falta Salvar.' : 'Nenhum grupo novo: já estavam na lista.');
+  if (novos) cfgSujo();
+}
+
+function cfgToggleEntrada(i, on) {
+  CFG_CDV.entrada[i].ativo = !!on;
+  cfgRenderEntrada();
+  cfgSujo();
+}
+
+function cfgRemoverEntrada(i) {
+  var g = CFG_CDV.entrada[i];
+  if (!confirm('Remover "' + cfgNomeDe(g.jid, g.nome) + '" da reentrada?\n\nPara apenas deixar de fora por ora, desmarque a caixa: o cadastro fica.')) return;
+  CFG_CDV.entrada.splice(i, 1);
+  cfgRenderEntrada();
+  cfgSujo();
 }
 
 function cfgRenderAdmins() {
@@ -5251,6 +5420,7 @@ async function cfgSalvar() {
       operador: document.getElementById('cfg-g-operador').value,
     },
     monitorados: CFG_CDV.monitorados,
+    entrada: CFG_CDV.entrada || [],
     admins: CFG_CDV.admins,
     envio:   { conta: document.getElementById('cfg-conta').value },
     leitura: { conta: document.getElementById('cfg-leitor-cdv').value },
@@ -5286,6 +5456,189 @@ async function cfgSalvar() {
   }
 }
 
+// ══ REENTRADA DE EX-ALUNO ══
+// Quem foi removido de um grupo nao entra por link: precisa ser ADICIONADO por
+// um admin. Esta aba so junta telefone + lista de grupos e chama o servidor —
+// a execucao (quem e admin de que grupo, pausa entre chamadas, convite quando o
+// WhatsApp recusa a adicao direta) e toda do baileys-server.
+var RE_GRUPOS = [];
+var RE_MARCADOS = {};
+var RE_CARREGADO = false;
+var RE_OCUPADO = false;
+
+// DDI implicito: telefone brasileiro digitado sem o 55 e o caso normal. Sem
+// isto o servidor receberia 11 digitos e devolveria "numero invalido" para um
+// numero que existe.
+function reTelefone() {
+  var d = (document.getElementById('re-tel').value || '').replace(/\D/g, '');
+  if (d.length === 10 || d.length === 11) d = '55' + d;
+  return d;
+}
+
+function reAoAbrir() {
+  if (!RE_CARREGADO) reCarregar(false);
+}
+
+async function reCarregar(comTelefone) {
+  var estado = document.getElementById('re-estado');
+  var tel = comTelefone ? reTelefone() : '';
+  if (comTelefone && tel.length < 12) {
+    estado.style.color = '#ff9a9d';
+    estado.textContent = 'Informe o telefone com DDI e DDD (ex.: 5531999998888).';
+    return;
+  }
+  estado.style.color = 'var(--muted)';
+  estado.textContent = comTelefone ? 'Conferindo em quais grupos esse número já está…' : 'Carregando grupos de reentrada…';
+  try {
+    var url = SERVER + '/cdv/entrada/grupos?t=' + Date.now() + (tel ? '&telefone=' + tel : '');
+    var r = await fetch(url, { cache:'no-cache', signal: AbortSignal.timeout(60000) });
+    var j = await r.json();
+    if (!j.ok) throw new Error(j.erro || 'resposta inválida');
+    RE_GRUPOS = j.grupos || [];
+    RE_CARREGADO = true;
+    RE_MARCADOS = {};
+    RE_GRUPOS.forEach(function(g) {
+      RE_MARCADOS[g.jid] = !!g.ativo && !g.bloqueado && g.jaEsta !== true;
+    });
+    reRender(j);
+  } catch (e) {
+    estado.style.color = '#ff9a9d';
+    estado.innerHTML = 'Não consegui carregar: ' + cfgEsc(e.message)
+      + ' <button class="camp-mini" onclick="reCarregar(false)">Tentar de novo</button>';
+  }
+}
+
+function reRender(j) {
+  var estado = document.getElementById('re-estado');
+  var alvo = document.getElementById('re-grupos');
+  if (!RE_GRUPOS.length) {
+    estado.style.color = 'var(--muted)';
+    estado.textContent = '';
+    alvo.innerHTML = '<p class="cfg-ajuda">Nenhum grupo cadastrado. Vá em <b>Config → Grupos de reentrada</b> e escolha os grupos do clube.</p>';
+    return;
+  }
+  var ativos = RE_GRUPOS.filter(function(g){ return g.ativo; });
+  var dentro = ativos.filter(function(g){ return g.jaEsta === true; }).length;
+  var bloq   = ativos.filter(function(g){ return g.bloqueado; }).length;
+  var linha = ativos.length + ' grupo(s) na reentrada';
+  if (j && j.telefone) linha += ' — já está em ' + dentro + ', falta em ' + (ativos.length - dentro);
+  if (bloq) linha += ' — ' + bloq + ' sem admin conectado';
+  if (j && j.executores && j.executores.length) linha += '. Executando por: ' + j.executores.join(', ') + '.';
+  estado.style.color = 'var(--muted)';
+  estado.textContent = linha;
+
+  var html = '';
+  RE_GRUPOS.forEach(function(g) {
+    var off = !g.ativo || g.bloqueado;
+    var tags = '';
+    if (!g.ativo)        tags += '<span style="color:var(--muted2)"> • desligado na Config</span>';
+    if (g.bloqueado)     tags += '<span style="color:#ff9a9d"> • nenhum número conectado é admin</span>';
+    if (g.jaEsta === true)  tags += '<span style="color:var(--green,#3ddc84)"> • já está no grupo</span>';
+    if (g.jaEsta === false) tags += '<span style="color:var(--muted2)"> • fora do grupo</span>';
+    html += '<div class="cfg-linha' + (off ? ' off' : '') + '">'
+          + '<input type="checkbox" ' + (RE_MARCADOS[g.jid] ? 'checked' : '')
+          +   (off ? ' disabled' : '') + ' onchange="reToggle(\'' + cfgEsc(g.jid) + '\',this.checked)"/>'
+          + '<div style="flex:1;min-width:0">'
+          +   '<div class="cfg-nome">' + cfgEsc(g.nome || g.jid) + tags + '</div>'
+          +   '<div class="cfg-jid">' + cfgEsc(g.jid) + '</div>'
+          + '</div>'
+          + '</div>';
+  });
+  alvo.innerHTML = html;
+}
+
+function reToggle(jid, on) { RE_MARCADOS[jid] = !!on; }
+
+function reMarcar(on) {
+  RE_GRUPOS.forEach(function(g) {
+    if (!g.ativo || g.bloqueado) { RE_MARCADOS[g.jid] = false; return; }
+    RE_MARCADOS[g.jid] = !!on;
+  });
+  reRender(null);
+}
+
+function reSelecionados() {
+  return RE_GRUPOS.filter(function(g){ return RE_MARCADOS[g.jid] && g.ativo && !g.bloqueado; })
+                  .map(function(g){ return g.jid; });
+}
+
+async function reAdicionar() {
+  var fb = document.getElementById('re-fb');
+  var saida = document.getElementById('re-resultado');
+  if (RE_OCUPADO) return;
+  var tel = reTelefone();
+  if (tel.length < 12) {
+    fb.style.color = '#ff9a9d';
+    fb.textContent = 'Informe o telefone com DDI e DDD (ex.: 5531999998888).';
+    return;
+  }
+  var jids = reSelecionados();
+  if (!jids.length) {
+    fb.style.color = '#ff9a9d';
+    fb.textContent = 'Marque ao menos um grupo.';
+    return;
+  }
+  if (!confirm('Adicionar ' + tel + ' em ' + jids.length + ' grupo(s)?\n\n'
+    + 'São chamadas em série, com pausa entre elas — leva cerca de '
+    + Math.max(1, Math.round(jids.length * 6 / 60)) + ' minuto(s).')) return;
+
+  RE_OCUPADO = true;
+  fb.style.color = 'var(--muted)';
+  fb.textContent = 'Adicionando… não feche a aba.';
+  saida.innerHTML = '';
+  try {
+    var r = await fetch(SERVER + '/cdv/entrada/adicionar', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        telefone: tel,
+        jids: jids,
+        avisar: document.getElementById('re-avisar').checked,
+      }),
+      // Teto largo de proposito: 6s de pausa por grupo, e abortar no meio nao
+      // desfaz o que ja entrou — so esconde o resultado de quem entrou.
+      signal: AbortSignal.timeout(Math.max(120000, jids.length * 20000)),
+    });
+    var j = await r.json();
+    if (!j.ok) throw new Error(j.erro || 'falha ao adicionar');
+    fb.style.color = 'var(--green, #3ddc84)';
+    fb.textContent = '✓ ' + j.feitos + ' adicionado(s), ' + j.pulados + ' já estava(m), ' + j.falhas + ' pendente(s).'
+      + (j.avisado ? ' Links enviados no privado.' : '');
+    saida.innerHTML = reHtmlResultado(j);
+    // Retrato novo: o que entrou agora precisa aparecer como "ja esta" na
+    // proxima tentativa, senao a mesma pessoa e adicionada duas vezes.
+    reCarregar(true);
+  } catch (e) {
+    fb.style.color = '#ff9a9d';
+    fb.textContent = 'Não deu: ' + e.message;
+  } finally {
+    RE_OCUPADO = false;
+  }
+}
+
+function reHtmlResultado(j) {
+  var cor = { ok:'var(--green,#3ddc84)', pulado:'var(--muted2)', convite:'#ffc46b', bloqueado:'#ff9a9d', falha:'#ff9a9d' };
+  var html = '<div class="camp-sec">Resultado</div>';
+  (j.resultados || []).forEach(function(x) {
+    html += '<div class="cfg-linha">'
+          + '<div style="flex:1;min-width:0">'
+          +   '<div class="cfg-nome">' + cfgEsc(x.nome || x.jid) + '</div>'
+          +   '<div class="cfg-jid" style="color:' + (cor[x.estado] || 'var(--muted2)') + '">'
+          +     cfgEsc(x.estado) + ' — ' + cfgEsc(x.detalhe || '')
+          +     (x.por ? ' (por ' + cfgEsc(x.por) + ')' : '')
+          +   '</div>'
+          +   (x.link ? '<div class="cfg-jid"><a href="' + cfgEsc(x.link) + '" target="_blank" rel="noopener">'
+                      + cfgEsc(x.link) + '</a></div>' : '')
+          + '</div>'
+          + (x.link ? '<button class="camp-mini" onclick="reCopiarLink(\'' + cfgEsc(x.link) + '\')">Copiar</button>' : '')
+          + '</div>';
+  });
+  return html;
+}
+
+function reCopiarLink(link) {
+  try { navigator.clipboard.writeText(link); } catch (e) {}
+}
+
 // ══ TEMA ══
 function aplicarTema(t) {
   document.body.setAttribute('data-tema', t);
@@ -5309,6 +5662,7 @@ window.addEventListener('DOMContentLoaded', function() {
   document.getElementById('tab-enviadas').addEventListener('click', function(){ switchMain('enviadas'); });
   document.getElementById('tab-ofertas').addEventListener('click', function(){ switchMain('ofertas'); });
   document.getElementById('tab-campanha').addEventListener('click', function(){ switchMain('campanha'); });
+  document.getElementById('tab-entrada').addEventListener('click', function(){ switchMain('entrada'); });
   document.getElementById('tab-config').addEventListener('click', function(){ switchMain('config'); });
   var cfgCorpo = document.getElementById('camp-cfg-corpo');
   ['input','change'].forEach(function(ev){ cfgCorpo.addEventListener(ev, function(){ campSujo(); }); });
