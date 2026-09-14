@@ -834,6 +834,7 @@ body[data-tema="light"] textarea.out{color:var(--text)}
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
         <button class="camp-mini" style="padding:10px 14px" onclick="cfgAddEntrada()">+ Adicionar selecionados</button>
         <button class="camp-mini" style="padding:10px 14px" onclick="cfgEntSelTodos()">Selecionar todos os filtrados</button>
+        <button class="camp-mini" style="padding:10px 14px" onclick="cfgRecarregarNomes()" title="Relê os grupos de todos os números conectados">🔄 Atualizar lista de grupos</button>
         <span id="cfg-ent-sel" style="font-size:12px;color:var(--muted2)"></span>
       </div>
 
@@ -5041,6 +5042,27 @@ function cfgRenderEntNovo() {
     }).join('');
   }
   cfgEntSelInfo();
+}
+
+// Relê a lista de grupos direto do WhatsApp de TODOS os números conectados. A
+// lista chega da conta principal + das contas Tico; grupo em que só o Tico está
+// (o caso do Super Promos CDV) só aparece depois desta leitura.
+async function cfgRecarregarNomes() {
+  cfgEntSelInfo('Relendo os grupos de todos os números… pode levar alguns segundos.');
+  try {
+    var r = await fetch(SERVER + '/config-cdv?refresh=1&t=' + Date.now(),
+                        { cache:'no-cache', signal: AbortSignal.timeout(90000) });
+    var j = await r.json();
+    if (!j.ok) throw new Error(j.erro || 'resposta inválida');
+    var antes = Object.keys(CFG_NOMES).length;
+    CFG_NOMES = j.nomes || {};
+    var novos = Object.keys(CFG_NOMES).length - antes;
+    cfgRenderEntNovo();
+    cfgEntSelInfo(Object.keys(CFG_NOMES).length + ' grupo(s) na lista'
+      + (novos > 0 ? ' — ' + novos + ' novo(s).' : '.'));
+  } catch (e) {
+    cfgEntSelInfo('Não consegui atualizar: ' + e.message);
+  }
 }
 
 function cfgEntSelecionados() {
