@@ -1,2 +1,2 @@
-# clube-do-viajante
-Gerador de mensagens para o clube do viajante
+# gestor-cdv
+Painel de gestao do Clube do Viajante — mensagens, emissoes, campanhas, reentrada em grupos e configuracao.
