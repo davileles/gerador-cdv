@@ -820,6 +820,14 @@ body[data-tema="light"] textarea.out{color:var(--text)}
         <span id="cfg-mon-sel" style="font-size:12px;color:var(--muted2)"></span>
       </div>
 
+      <div class="camp-sec">Categorias de oferta</div>
+      <p class="cfg-ajuda">
+        O que os grupos de <b>Ofertas</b> podem mandar para a aba <b>Aprovar Ofertas</b>. Desmarcar uma categoria
+        faz a captura descartá-la depois da leitura da IA — o descarte fica registrado, não some sem rastro.
+        Só vale para a captura de grupo; o coletor de RSS não passa por aqui.
+      </p>
+      <div id="cfg-categorias"></div>
+
       <div class="camp-sec">Grupos de reentrada</div>
       <p class="cfg-ajuda">
         Onde o ex-aluno é recolocado pela aba <b>Reentrada</b>. Lista separada dos destinos e dos monitorados de
@@ -4781,6 +4789,17 @@ var CFG_CONTAS = [];
 // ela um número ocupado lendo o Tica apareceria aqui como "Sem papel".
 var CFG_LEITORES = [];
 var CFG_PAPEIS = ['config','aprovar','disparar','avisos'];
+// Lista de categorias vem do servidor (config-cdv.js). Fallback so para a tela
+// nao ficar vazia se o servidor for antigo — e a lista da versao que introduziu
+// o filtro.
+var CFG_CATEGORIAS = [
+  { id:'transferencia', emoji:'🔄', rotulo:'Transferência bonificada' },
+  { id:'compra', emoji:'💰', rotulo:'Compra de pontos' },
+  { id:'compra_bonificada', emoji:'🛍️', rotulo:'Compra bonificada em parceiro' },
+  { id:'clube', emoji:'🎁', rotulo:'Clube de assinatura' },
+  { id:'cartao', emoji:'💳', rotulo:'Cartão de crédito' },
+  { id:'geral', emoji:'📰', rotulo:'Geral / não classificada' },
+];
 var CFG_PAPEL_ROTULO = { config:'Config', aprovar:'Aprovar', disparar:'Disparar', avisos:'Avisos' };
 
 function cfgEsc(s) {
@@ -4812,6 +4831,7 @@ async function cfgCarregar() {
     CFG_LEITORES = j.leitores || [];
     CFG_PRINCIPAL = j.principal || null;
     if (Array.isArray(j.papeis) && j.papeis.length) CFG_PAPEIS = j.papeis;
+    if (Array.isArray(j.categoriasOferta) && j.categoriasOferta.length) CFG_CATEGORIAS = j.categoriasOferta;
     cfgRender();
     carregando.style.display = 'none';
     app.style.display = 'block';
@@ -4824,6 +4844,7 @@ async function cfgCarregar() {
 function cfgRender() {
   cfgRenderSelectsGrupo();
   cfgRenderMonitorados();
+  cfgRenderCategorias();
   cfgRenderEntrada();
   cfgRenderAdmins();
   cfgRenderContas();
@@ -4988,6 +5009,40 @@ function cfgAddMonitorado() {
 }
 
 // ══ CONFIG: GRUPOS DE REENTRADA ══
+// Filtro da fila de ofertas. MARCADO = passa; desmarcado = bloqueado. A tela
+// fala em "aceitar" e o servidor guarda o inverso (lista de bloqueadas) de
+// proposito: assim categoria nova criada no servidor entra aceita por padrao,
+// em vez de nascer invisivel para o operador.
+function cfgRenderCategorias() {
+  if (!CFG_CDV.ofertas) CFG_CDV.ofertas = { categoriasBloqueadas: [] };
+  if (!Array.isArray(CFG_CDV.ofertas.categoriasBloqueadas)) CFG_CDV.ofertas.categoriasBloqueadas = [];
+  var bloq = CFG_CDV.ofertas.categoriasBloqueadas;
+  var html = '';
+  CFG_CATEGORIAS.forEach(function(c) {
+    var on = bloq.indexOf(c.id) < 0;
+    html += '<div class="cfg-linha' + (on ? '' : ' off') + '">'
+          + '<input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="cfgToggleCategoria(\'' + c.id + '\',this.checked)"/>'
+          + '<div style="flex:1;min-width:0">'
+          +   '<div class="cfg-nome">' + c.emoji + ' ' + cfgEsc(c.rotulo) + '</div>'
+          +   '<div class="cfg-jid">' + cfgEsc(c.id) + (on ? '' : ' — bloqueada') + '</div>'
+          + '</div>'
+          + '</div>';
+  });
+  if (bloq.length === CFG_CATEGORIAS.length) {
+    html += '<p class="cfg-ajuda" style="color:#ff9a9d">Tudo desmarcado: nenhuma captura de grupo vai chegar na aprovação.</p>';
+  }
+  document.getElementById('cfg-categorias').innerHTML = html;
+}
+
+function cfgToggleCategoria(id, aceita) {
+  var bloq = CFG_CDV.ofertas.categoriasBloqueadas;
+  var i = bloq.indexOf(id);
+  if (aceita && i >= 0) bloq.splice(i, 1);
+  if (!aceita && i < 0) bloq.push(id);
+  cfgRenderCategorias();
+  cfgSujo();
+}
+
 // Mesma mecanica dos monitorados: cadastro com liga/desliga e um seletor
 // multiplo filtravel para adicionar. Servidor antigo (sem a secao) devolve
 // config sem `entrada` — sem este default a tela quebraria no primeiro render.
@@ -5443,6 +5498,7 @@ async function cfgSalvar() {
     },
     monitorados: CFG_CDV.monitorados,
     entrada: CFG_CDV.entrada || [],
+    ofertas: { categoriasBloqueadas: (CFG_CDV.ofertas && CFG_CDV.ofertas.categoriasBloqueadas) || [] },
     admins: CFG_CDV.admins,
     envio:   { conta: document.getElementById('cfg-conta').value },
     leitura: { conta: document.getElementById('cfg-leitor-cdv').value },
