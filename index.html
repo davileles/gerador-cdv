@@ -945,23 +945,12 @@ var PROGRAMAS_CPM = {
 // afiliado) vive em painel-cdv/links.json e e resolvido pelo endpoint /ir do
 // proxy Railway. Para trocar um destino NAO mexa aqui: edite links.json.
 //
-// TEMPORARIO (28/08/2026): ir.clubedoviajante.com.br NAO esta cadastrado como
-// custom domain no Railway -- o plano permite 2 e os slots estao ocupados por
-// grupo.tudosobrepromos.com e ir.ticapromos.com.br. Enquanto isso os links saem
-// no dominio nativo do proxy: mesmos slugs, mesmo links.json, mesmos cliques em
-// /ir-stats. So perde a mascara. Quando grupo.tudosobrepromos.com for desligado,
-// cadastre ir.clubedoviajante.com.br no Railway, ajuste o CNAME na Hostinger e
-// reverta esta linha para 'https://ir.clubedoviajante.com.br/' -- nada mais
-// precisa mudar, o guard de host abaixo se ajusta sozinho.
-var IR_BASE = 'https://cdv-proxy-production.up.railway.app/ir/';
-// DESLIGADO (03/09/2026): enquanto ir.clubedoviajante.com.br nao estiver
-// cadastrado como custom domain no Railway, as ofertas saem com o link ORIGINAL,
-// exatamente como veio da fonte -- sem /ir, sem ?o=, sem params de afiliado.
-// Motivo: o dominio nativo do proxy aparecendo cru na mensagem do grupo.
-// Para reativar a mascara basta voltar IR_ATIVO para true -- nada mais muda.
-// Obs: linkPrograma (aba Emissao) NAO depende deste flag, pois ali nao existe
-// URL de origem para usar como fallback.
-var IR_ATIVO = false;
+// Dominio mascarado ativo no Railway desde 15/09/2026 (servico do proxy).
+// ESPELHAR qualquer troca em baileys-server/server.js (IR_BASE), que tem a mesma const.
+var IR_BASE = 'https://ir.clubedoviajante.com.br/';
+// Liga/desliga a mascara nas ofertas (aba Oferta). Com false, as ofertas saem
+// com o link ORIGINAL da fonte. linkPrograma (aba Emissao) nao depende deste flag.
+var IR_ATIVO = true;
 // Host do IR_BASE vigente, para nao mascarar duas vezes uma URL ja mascarada.
 var IR_HOST = (function(){ try { return new URL(IR_BASE).hostname.toLowerCase(); } catch(e) { return ''; } })();
 var PROGRAMAS_SLUG = {
