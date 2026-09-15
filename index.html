@@ -973,7 +973,7 @@ var PROGRAMAS_SLUG = {
 // anexa os parametros de afiliado do links.json. hostBase e o host usado no modo
 // passthrough (/slug/caminho); os demais dominios caem no modo ?u=.
 var AFILIADOS = [
-  { slug:'smiles', hostBase:'www.smiles.com.br',       dominios:['smiles.com.br'] },
+  { slug:'smiles', hostBase:'www.smiles.com.br',       dominios:['smiles.com.br','shoppingsmiles.com.br'] },
   { slug:'latam',  hostBase:'www.latamairlines.com',   dominios:['latamairlines.com','latampass.latam.com','latampass.com'] },
   { slug:'azul',   hostBase:'www.voeazul.com.br',      dominios:['voeazul.com.br'] }
 ];
@@ -1027,7 +1027,7 @@ function afiliarTexto(txt, origem) {
   if (!txt) return txt;
   return String(txt).replace(/https?:\/\/[^\s<>"']+/g, function(m){
     var fim = '';
-    while (/[.,;:)\]]$/.test(m)) { fim = m.slice(-1)+fim; m = m.slice(0,-1); }
+    while (/[.,;:)\]*_~]$/.test(m)) { fim = m.slice(-1)+fim; m = m.slice(0,-1); }
     return afiliarLink(m, origem) + fim;
   });
 }
@@ -2074,7 +2074,7 @@ function gerarMensagemEmissao(idx) {
 function copiarEmissao(idx) {
   var id='m-em-'+idx;
   var editEl=document.getElementById(id+'-msg-edit');
-  var texto=editEl?editEl.value:'';
+  var texto=afiliarTexto(editEl?editEl.value:'', 'em');
   var okEl=document.getElementById(id+'-ok');
   if (!texto){okEl.textContent='Gere a mensagem primeiro.';return;}
   var done=function(){ okEl.style.color='#4ade80'; okEl.textContent='Copiado!'; setTimeout(function(){ okEl.textContent=''; },3500); };
@@ -2099,7 +2099,8 @@ async function registrarPassagem(dados) {
 async function enviarEmissao(idx) {
   var id='m-em-'+idx;
   var editEl=document.getElementById(id+'-msg-edit');
-  var texto=editEl?editEl.value:'';
+  // Mascara qualquer link afiliado colado/editado no texto, nao so o do bloco LINK
+  var texto=afiliarTexto(editEl?editEl.value:'', 'em');
   var s=document.getElementById(id+'-send-ok');
   if (!wsConectado){s.style.color='#ff585e';s.textContent='Servidor desconectado.';setTimeout(function(){s.textContent='';},4000);return;}
 
@@ -3595,6 +3596,8 @@ async function aprovarOfertaPendente(id, enviarWhats) {
       // Usa o conteúdo do textarea de preview (permite edição manual antes de aprovar)
       var msgEl = document.getElementById('of-msg-'+id);
       var mensagem = (msgEl && msgEl.value.trim()) ? msgEl.value : montarMensagemRadar(ofertaEditada);
+      // Edicao manual pode ter colado link afiliado cru -- mascara a mensagem inteira
+      mensagem = afiliarTexto(mensagem, 'of');
 
       // Desabilitar card IMEDIATAMENTE ao aprovar
       var cardImediato = document.getElementById('oferta-card-'+id);
@@ -3833,7 +3836,7 @@ function mostrar(msgId,cardId,okId,msg) {
 
 function copiar(msgId,okId) {
   var editEl=document.getElementById(msgId+'-edit');
-  var texto=editEl?editEl.value:'';
+  var texto=afiliarTexto(editEl?editEl.value:'', msgId.charAt(0)==='o' ? 'of' : 'em');
   var okEl=document.getElementById(okId);
   if (!texto){okEl.textContent='Gere a mensagem primeiro.';return;}
   var done=function(){okEl.style.color='#4ade80';okEl.textContent='Copiado! Cole direto no WhatsApp.';setTimeout(function(){okEl.textContent='';},3500);};
@@ -3889,7 +3892,8 @@ function verificarOfertasPendentes(){
 
 async function enviarWA(msgId,statusId,fileKey) {
   var editEl=document.getElementById(msgId+'-edit');
-  var texto=editEl?editEl.value:'';
+  // Mascara qualquer link afiliado colado/editado no texto, nao so o do bloco LINK
+  var texto=afiliarTexto(editEl?editEl.value:'', fileKey==='o' ? 'of' : 'em');
   var s=document.getElementById(statusId);
   if (!wsConectado){s.style.color='#ff585e';s.textContent='Servidor desconectado.';setTimeout(function(){s.textContent='';},4000);return;}
 
